@@ -46,32 +46,44 @@ def index(request):
     return render(request, 'library/index.html', {'books': page_obj, 'categories': categories})
 
 def send_sms_wigal(phone, message):
-    """Send SMS using Wigal API."""
-    # Based on user's Code.gs working example
+    """Send SMS using Wigal Frog v3 API."""
     api_key = settings.WIGAL_API_KEY
+    username = settings.WIGAL_USERNAME
     sender_id = settings.WIGAL_SENDER_ID
     
-    if not api_key:
+    if not api_key or not username:
         print("WIGAL credentials not set. SMS skipped.")
         return
 
-    url = 'https://logon.wigal.com.gh/api/v2/sendmsg'
+    # User provided working "Frog" API v3 URL
+    url = 'https://frogapi.wigal.com.gh/api/v3/sms/send'
+    
+    # Clean phone number (simple logic: remove +)
+    clean_phone = str(phone).replace('+', '').strip()
     
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': f'Bearer {api_key}' 
+        'API-KEY': api_key,
+        'USERNAME': username
     }
     
-    # Payload
+    # Frog Payload Structure
+    # destinations is an array of objects
     payload = {
-        "sender_id": sender_id,
-        "phone": phone,
-        "message": message
+        "senderid": sender_id,
+        "destinations": [
+            {
+                "destination": clean_phone,
+                "msgid": f"FAYM_{uuid.uuid4().hex[:10]}"
+            }
+        ],
+        "message": message,
+        "smstype": "text"
     }
     
     try:
         response = requests.post(url, json=payload, headers=headers)
-        print(f"SMS Response: {response.text}") # Debug log
+        print(f"SMS Response ({response.status_code}): {response.text}") # Debug log
     except Exception as e:
         print(f"SMS Failed: {e}")
 
