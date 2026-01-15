@@ -11,10 +11,26 @@ import csv
 import datetime
 import uuid
 
+from django.db.models import Count
+from collections import Counter
+
 def index(request):
-    """Main landing page with search."""
-    books = Book.objects.all().order_by('-book_id')[:20] # Show recent
-    categories = ["Faith", "Love", "Leadership", "Prayer", "Fiction", "Finance"]
+    """Main landing page with search and dynamic categories."""
+    books = Book.objects.all().order_by('-book_id')[:20]
+    
+    # Aggregate all keywords
+    all_books = Book.objects.values_list('keywords', flat=True)
+    keyword_counter = Counter()
+    
+    for k_str in all_books:
+        if k_str:
+            # Split by comma, strip whitespace, and normalize
+            parts = [k.strip().title() for k in k_str.split(',') if k.strip()]
+            keyword_counter.update(parts)
+            
+    # Get top 15 most common categories
+    categories = [k for k, v in keyword_counter.most_common(15)]
+    
     return render(request, 'library/index.html', {'books': books, 'categories': categories})
 
 def search_books(request):
