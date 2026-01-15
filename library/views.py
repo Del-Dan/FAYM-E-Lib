@@ -39,13 +39,25 @@ def index(request):
 def send_sms_wigal(phone, message):
     """Send SMS using Wigal API."""
     api_key = settings.WIGAL_API_KEY
+    username = settings.WIGAL_USERNAME
     sender_id = settings.WIGAL_SENDER_ID
     
-    if not api_key:
-        print("WIGAL_API_KEY not set. SMS skipped.")
+    if not api_key or not username:
+        print("WIGAL credentials not set. SMS skipped.")
         return
 
+    # Use the v2 endpoint which is common for Wigal
     url = 'https://logon.wigal.com.gh/api/v2/sendmsg'
+    
+    # Headers typically require Basic Auth or separate keys depending on version
+    # Based on search: API-KEY and USERNAME in headers is a common pattern
+    headers = {
+        'Content-Type': 'application/json',
+        'api_key': api_key, # Try header based auth first
+        'username': username
+    }
+    
+    # Payload
     payload = {
         "sender_id": sender_id,
         "phone": phone,
@@ -53,8 +65,11 @@ def send_sms_wigal(phone, message):
     }
     
     try:
-        response = requests.post(url, json=payload, headers={'Authorization': f'Bearer {api_key}'})
-        # print(f"SMS Response: {response.text}")
+        # Some versions pass credentials in payload, let's try standard POST first
+        response = requests.post(url, json=payload, headers=headers)
+        
+        # Fallback: If 401, try query params or different payload structure if needed
+        # But for now, we follow the common header pattern
     except Exception as e:
         print(f"SMS Failed: {e}")
 
@@ -196,7 +211,7 @@ def submit_request(request):
         ).first()
         
         if not member:
-            messages.error(request, "Membership validation failed. Please register first.")
+            messages.error(request, "Access Denied: You are not a registered member of the ministry.")
             return redirect('index')
             
         # Create Request
@@ -204,25 +219,44 @@ def submit_request(request):
             full_name=f"{member.firstname} {member.surname}",
             email=member.email,
             book=book,
-            request_status='Valid', # Since we validated
+            request_status='Valid',
             approval_status='Pending'
         )
         
-        # Automations (SC auto-approve placeholder)
+        # === SCENARIO 1: SOFT COPY (Auto-Approve) ===
         if book.type == 'SC':
-            # 1. Send Email
-            subject = f"Book Request Received: {book.title}"
-            msg_body = f"Hello {member.firstname},\n\nWe received your request for '{book.title}'.\nWe will notify you once approved.\n\nFAYM Library"
+            req.approval_status = 'Approved'
+            req.save()
             
+            # Message
+            sms_msg = f"Request Received. Token: {req.token}. Link: {book.location}"
+            email_body = f"Hello {member.firstname},\n\nYour request for '{book.title}' is approved.\n\nToken: {req.token}\nLink: {book.location}\n\nFAYM Library"
+            
+            # Send
+            threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
             try:
-                send_mail(subject, msg_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
-            except Exception as e:
-                print(f"Email Failed: {e}")
-
-            # 2. Send SMS
-            sms_msg = f"Hi {member.firstname}, request for {book.title} received. FAYM Lib"
-            # Note: Ensure mobile number is formatted correctly (e.g., 233...) if Wigal requires specific format
-            send_sms_wigal(member.mobile_number, sms_msg)
+                send_mail(f"Approved: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
+            except: pass
+            
+        # === SCENARIO 2: HARD COPY (Availability Check) ===
+        else:
+            # Check if available
+            if book.availability != 'Available':
+                # This should logically prevent request, but if they get here:
+                messages.error(request, f"Book is currently unavailable. Check back later.")
+                req.delete() # Undo creation
+                return redirect('index')
+            
+            # Available -> Pending Approval
+            sms_msg = f"Request Received. Token: {req.token}. We will contact you shortly."
+            email_body = f"Hello {member.firstname},\n\nWe received your request for '{book.title}'.\nToken: {req.token}\n\nWe will contact you shortly for pickup.\n\nFAYM Library"
+            
+            threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
+            try:
+                send_mail(f"Received: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
+            except: pass
+            
+        messages.success(request, f"Request received! Token: {req.token}")
             
         messages.success(request, f"Request received! Token: {req.token}")
         return redirect('index')

@@ -140,4 +140,5 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Wigal SMS Configuration
 WIGAL_API_KEY = os.environ.get('WIGAL_API_KEY', '')
+WIGAL_USERNAME = os.environ.get('WIGAL_USERNAME', '')
 WIGAL_SENDER_ID = os.environ.get('WIGAL_SENDER_ID', 'DelDan')
