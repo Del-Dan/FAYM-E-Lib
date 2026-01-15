@@ -41,37 +41,36 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"Error: {e}"))
 
     def process_file(self, dbx, entry):
-        # Basic check if book exists by title (derived from filename)
-        # simplistic assumption: Filename = Title.pdf
-        filename = entry.name
-        title = filename.rsplit('.', 1)[0].replace('_', ' ').replace('-', ' ')
-        
+        # Check if book exists
+        title = entry.name.replace('.pdf', '').replace('.epub', '').replace('_', ' ').strip()
         if Book.objects.filter(title__iexact=title).exists():
-            self.stdout.write(f"Skipping existing: {title}")
+            self.stdout.write(f"Skipping existing book: {title}")
             return
 
-        # Get Share Link
+        # Create Shared Link
         link = ""
         try:
-            # Check existing links
-            links = dbx.sharing_list_shared_links(path=entry.path_lower).links
-            if links:
-                link = links[0].url
+            # First try to create (might fail if exists)
+            link_meta = dbx.sharing_create_shared_link_with_settings(entry.path_lower)
+            link = link_meta.url
+        except dropbox.exceptions.ApiError as e:
+            # If already exists, list it
+            if e.error.is_shared_link_already_exists():
+                links = dbx.sharing_list_shared_links(path=entry.path_lower).links
+                if links:
+                    link = links[0].url
             else:
-                # Create new
-                link_meta = dbx.sharing_create_shared_link_with_settings(entry.path_lower)
-                link = link_meta.url
-        except Exception as e:
-            self.stdout.write(self.style.WARNING(f"Could not link {filename}: {e}"))
-            
+                self.stdout.write(self.style.ERROR(f"Error getting link for {title}: {e}"))
+                return # Skip if we can't get a link
+
         if link:
             Book.objects.create(
                 title=title,
-                author="Unknown Import", # User will have to edit this later
                 type='SC',
-                keywords="Imported",
-                owner="FAYM",
+                author='Unknown Import',
+                owner='FAYM',
                 location=link,
-                availability="Available"
+                availability='Available',
+                keywords=''
             )
             self.stdout.write(self.style.SUCCESS(f"Imported: {title}"))

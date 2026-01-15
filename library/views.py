@@ -68,23 +68,30 @@ def check_member(request):
 
 @staff_member_required
 def bulk_import(request):
-    """Admin-only view for bulk operations."""
+    """Dashboard for running bulk import commands."""
+    if not request.user.is_staff:
+        # redirect or 403
+        return redirect('index')
+
     if request.method == 'POST':
-        action = request.POST.get('action')
-        
-        if action == 'sync_dropbox':
-            # Run the management command logic directly or via call_command
-            # Note: call_command output capturing is tricky in views but we'll try basic
-            try:
-                # We need a folder path. Let's assume root '/' or get from input
-                folder = request.POST.get('dropbox_folder', '/')
-                output = io.StringIO()
-                call_command('import_dropbox', folder, stdout=output)
-                messages.success(request, f"Dropbox Sync: {output.getvalue()}")
-            except Exception as e:
-                messages.error(request, f"Dropbox Sync Error: {e}")
-                
-        elif action == 'import_members':
+        if 'sync_dropbox' in request.POST:
+            folder = request.POST.get('dropbox_path')
+            
+            def run_sync():
+                # Run the command with a dummy output or capture it if we implemented logging
+                try:
+                    call_command('import_dropbox', folder)
+                except Exception as e:
+                    print(f"Background Sync Error: {e}")
+
+            # Start in background thread
+            thread = threading.Thread(target=run_sync)
+            thread.start()
+            
+            messages.success(request, f"Dropbox Sync started in background for '{folder}'. This may take a few minutes. Check the 'Books' list periodically.")
+            return redirect('bulk_import')
+
+        elif 'import_members' in request.POST:
             csv_file = request.FILES.get('csv_file')
             if not csv_file:
                 messages.error(request, "Please upload a CSV file.")
