@@ -73,6 +73,16 @@
     isLoading: false,
     csrf: document.querySelector('[name=csrfmiddlewaretoken]').value,
     
+    // Toast State
+    toast: { show: false, msg: '', type: 'success' },
+    
+    showToast(message, type = 'success') {
+        this.toast.msg = message;
+        this.toast.type = type;
+        this.toast.show = true;
+        setTimeout(() => { this.toast.show = false }, 4000);
+    },
+    
     reset() {
         this.step = 1;
         this.identity = '';
@@ -99,9 +109,10 @@
         this.isLoading = false;
         
         if (data.status === 'sent') {
+            this.showToast(data.message, 'success');
             this.step = 2; // Move to OTP entry
         } else {
-            alert(data.message);
+            this.showToast(data.message, 'error');
         }
     },
     
@@ -116,13 +127,31 @@
         this.isLoading = false;
         
         if (data.status === 'success') {
+            this.showToast(data.message, 'success');
             this.step = 3; // Ready to submit
         } else {
-            alert(data.message);
+            this.showToast(data.message, 'error');
         }
     }
 }" @open-request-modal.window="open = true; bookId = $event.detail.id; bookTitle = $event.detail.title; reset();"
     x-show="open" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition.opacity>
+
+    <!-- Toast UI -->
+    <div x-show="toast.show" x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 transform translate-y-2"
+        x-transition:enter-end="opacity-100 transform translate-y-0"
+        x-transition:leave="transition ease-in duration-300"
+        x-transition:leave-start="opacity-100 transform translate-y-0"
+        x-transition:leave-end="opacity-0 transform translate-y-2"
+        class="fixed top-6 right-6 z-[100] px-6 py-4 rounded-xl shadow-2xl text-white font-semibold flex items-center gap-3 min-w-[300px]"
+        :class="toast.type === 'error' ? 'bg-rose-600' : 'bg-emerald-600'">
+        <span
+            x-html="toast.type === 'error' ? 
+            '<svg class=\'w-6 h-6\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z\'/></svg>' : 
+            '<svg class=\'w-6 h-6\' fill=\'none\' stroke=\'currentColor\' viewBox=\'0 0 24 24\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M5 13l4 4L19 7\'/></svg>'">
+        </span>
+        <span x-text="toast.msg"></span>
+    </div>
 
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="open = false"></div>
 

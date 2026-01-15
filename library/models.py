@@ -141,6 +141,10 @@ class BookRequest(models.Model):
         if self.book and self.book.type == 'SC':
             self.return_status = 'N/A'
             
+        # Auto-set Approval Date
+        if self.approval_status == 'Approved' and not self.approval_date:
+            self.approval_date = timezone.now()
+            
         super().save(*args, **kwargs)
 
     @property
@@ -189,3 +193,16 @@ class ValidateReturns(models.Model):
              return delta.days
         # For returns, need logic: Timestamp - Date of Action? 
         return 0
+
+class OTPRecord(models.Model):
+    phone_number = models.CharField(max_length=20)
+    otp_code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_verified = models.BooleanField(default=False)
+    
+    def is_valid(self):
+        return timezone.now() < self.expires_at and not self.is_verified
+        
+    def __str__(self):
+        return f"{self.phone_number} - {self.otp_code}"

@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q
-from .models import Book, Member, BookRequest
+from .models import Book, Member, BookRequest, OTPRecord
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -398,17 +398,28 @@ def send_otp(request):
     
     if not member:
         return JsonResponse({'status': 'error', 'message': 'Member not found.'})
+    
+    # Generate Code via Wigal (or self-generate if Wigal just sends msg)
+    # Wigal Generate endpoint actually returns the code it sent? 
+    # Yes, based on docs it returns {status, message, otpcode}.
+    otp_code = generate_wigal_otp(member.mobile_number)
+    
+    if otp_code:
+        # Store in DB (Temporal Storage as requested)
+        # Invalidate previous unverified codes
+        OTPRecord.objects.filter(phone_number=member.mobile_number, is_verified=False).delete()
         
-    # Send OTP Logic
-    # We rely on Wigal to send the SMS. 
-    # We store the phone number in session to verify against later.
-    request.session['otp_phone'] = member.mobile_number
-    
-    # Call Wigal Generate
-    # Note: Wigal sends the SMS automatically when we call generate
-    generate_wigal_otp(member.mobile_number)
-    
-    return JsonResponse({'status': 'sent', 'message': f'OTP sent to {member.mobile_number}'})
+        OTPRecord.objects.create(
+            phone_number=member.mobile_number,
+            otp_code=otp_code,
+            expires_at=timezone.now() + timedelta(minutes=5)
+        )
+        
+        # We still rely on user session to know WHICH phone they are claiming to be
+        request.session['otp_phone'] = member.mobile_number
+        return JsonResponse({'status': 'sent', 'message': f'OTP sent to {member.mobile_number}'})
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Failed to send OTP.'})
 
 def verify_otp_action(request):
     """HTMX View to verify OTP input."""
@@ -418,17 +429,25 @@ def verify_otp_action(request):
     if not phone:
          return JsonResponse({'status': 'error', 'message': 'Session expired. Request OTP again.'})
          
-    # Call Wigal Verify
-    is_valid = verify_wigal_otp(phone, code)
+    # DB Verification
+    record = OTPRecord.objects.filter(
+        phone_number=phone,
+        otp_code=code,
+        is_verified=False,
+        expires_at__gt=timezone.now()
+    ).first()
     
-    if is_valid:
+    if record:
+        record.is_verified = True
+        record.save()
+        
         # Set Session (30 mins)
         request.session['is_verified'] = True
-        request.session['verified_identity'] = phone # Or link to member
+        request.session['verified_identity'] = phone
         request.session['session_expiry'] = (timezone.now() + timedelta(minutes=30)).isoformat()
         return JsonResponse({'status': 'success', 'message': 'Verified!'})
     else:
-        return JsonResponse({'status': 'error', 'message': 'Invalid OTP.'})
+        return JsonResponse({'status': 'error', 'message': 'Invalid or Expired OTP.'})
 
 def check_request_limits(member, book_type):
     """
@@ -576,6 +595,23 @@ def admin_dashboard_view(request):
     approved_count = BookRequest.objects.filter(approval_status='Approved').count()
     pending_count = BookRequest.objects.filter(approval_status='Pending').count()
     active_members = Member.objects.count() # Total database members
+    
+    # 1b. Lead Time (Avg Duration from Request to Approval)
+    from django.db.models import Avg, F, DurationField, ExpressionWrapper
+    # SQLite/Postgres difference in duration math. Django handles it mostly.
+    # We only care about Approved ones with a date.
+    # Note: If approval_date is null, we skip.
+    
+    valid_approvals = BookRequest.objects.filter(approval_status='Approved', approval_date__isnull=False)
+    # Python calc is often safer for cross-db compatibility with durations if volume is low.
+    lead_times = [(r.approval_date - r.timestamp).total_seconds() for r in valid_approvals]
+    
+    if lead_times:
+        avg_seconds = sum(lead_times) / len(lead_times)
+        avg_hours = round(avg_seconds / 3600, 1)
+        lead_time_display = f"{avg_hours} Hours"
+    else:
+        lead_time_display = "N/A"
 
     # 2. Top Books (Most Requested)
     top_books = BookRequest.objects.values('book__title').annotate(count=Count('id')).order_by('-count')[:5]
@@ -618,6 +654,7 @@ def admin_dashboard_view(request):
         'approved_count': approved_count,
         'pending_count': pending_count,
         'active_members': active_members,
+        'lead_time': lead_time_display,
         'top_books': top_books,
         'top_members': top_members,
         'pie_labels': pie_labels,
