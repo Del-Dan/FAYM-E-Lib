@@ -114,8 +114,10 @@ def bulk_import(request):
         return redirect('index')
 
     if request.method == 'POST':
-        if 'sync_dropbox' in request.POST:
-            folder = request.POST.get('dropbox_path')
+        action = request.POST.get('action')
+        
+        if action == 'sync_dropbox':
+            folder = request.POST.get('dropbox_folder') # Fixed key name from template
             
             def run_sync():
                 # Run the command with a dummy output or capture it if we implemented logging
@@ -131,7 +133,7 @@ def bulk_import(request):
             messages.success(request, f"Dropbox Sync started in background for '{folder}'. This may take a few minutes. Check the 'Books' list periodically.")
             return redirect('bulk_import')
 
-        elif 'import_members' in request.POST:
+        elif action == 'import_members':
             csv_file = request.FILES.get('csv_file')
             if not csv_file:
                 messages.error(request, "Please upload a CSV file.")
@@ -168,7 +170,7 @@ def bulk_import(request):
                 except Exception as e:
                     messages.error(request, f"Member Import Error: {e}")
 
-        elif 'update_metadata' in request.POST:
+        elif action == 'update_metadata':
             csv_file = request.FILES.get('csv_file')
             if not csv_file:
                 messages.error(request, "Please upload a CSV file.")
@@ -176,11 +178,13 @@ def bulk_import(request):
                 try:
                     decoded_file = csv_file.read().decode('utf-8').splitlines()
                     reader = csv.DictReader(decoded_file)
+                    print(f"DEBUG: CSV Headers detected: {reader.fieldnames}") # DEBUG
                     updated = 0
                     created = 0
                     skipped_no_link = 0
                     
-                    for row in reader:
+                    for i, row in enumerate(reader):
+                        if i < 3: print(f"DEBUG: Row {i}: {row}") # DEBUG
                         title = row.get('Title', '').strip()
                         if not title: continue
                         
