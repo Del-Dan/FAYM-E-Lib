@@ -34,8 +34,9 @@
                     </span>
                 </div>
 
-                <h3
-                    class="text-lg font-bold text-slate-900 mb-1 leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">
+                <h3 title="{{ book.title }}"
+                    class="text-lg font-bold text-slate-900 mb-1 leading-snug group-hover:text-blue-600 transition-colors line-clamp-2"
+                    title="{{ book.title }}">
                     {{ book.title }}
                 </h3>
                 <p class="text-sm text-slate-500 truncate mb-2">{{ book.author }}</p>
@@ -66,6 +67,32 @@
     </div>
 </div>
 {% endfor %}
+
+<!-- Pagination Controls -->
+{% if books.has_next or books.has_previous %}
+<div class="col-span-full flex justify-center py-8 space-x-2">
+    {% if books.has_previous %}
+    <button hx-get="{% url 'search_books' %}?page={{ books.previous_page_number }}" hx-target="#book-results"
+        hx-include="[name='q'], [name='category'], [name='filter_type']"
+        class="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600">
+        &larr; Previous
+    </button>
+    {% endif %}
+
+    <span class="px-4 py-2 text-slate-500 font-medium">
+        Page {{ books.number }} of {{ books.paginator.num_pages }}
+    </span>
+
+    {% if books.has_next %}
+    <button hx-get="{% url 'search_books' %}?page={{ books.next_page_number }}" hx-target="#book-results"
+        hx-include="[name='q'], [name='category'], [name='filter_type']"
+        class="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600">
+        Next &rarr;
+    </button>
+    {% endif %}
+</div>
+{% endif %}
+
 {% else %}
 <div class="col-span-full text-center py-12">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-slate-300 mb-4" fill="none"

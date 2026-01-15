@@ -32,29 +32,35 @@ def index(request):
             keyword_counter.update(parts)
             
     # Get top 15 most common categories
+    # Get top 15 most common categories
     categories = [k for k, v in keyword_counter.most_common(15)]
     
-    return render(request, 'library/index.html', {'books': books, 'categories': categories})
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(books, 20) # Show 20 contacts per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    if request.htmx:
+        return render(request, 'library/partials/book_list.html', {'books': page_obj})
+
+    return render(request, 'library/index.html', {'books': page_obj, 'categories': categories})
 
 def send_sms_wigal(phone, message):
     """Send SMS using Wigal API."""
+    # Based on user's Code.gs working example
     api_key = settings.WIGAL_API_KEY
-    username = settings.WIGAL_USERNAME
     sender_id = settings.WIGAL_SENDER_ID
     
-    if not api_key or not username:
+    if not api_key:
         print("WIGAL credentials not set. SMS skipped.")
         return
 
-    # Use the v2 endpoint which is common for Wigal
     url = 'https://logon.wigal.com.gh/api/v2/sendmsg'
     
-    # Headers typically require Basic Auth or separate keys depending on version
-    # Based on search: API-KEY and USERNAME in headers is a common pattern
     headers = {
         'Content-Type': 'application/json',
-        'api_key': api_key, # Try header based auth first
-        'username': username
+        'Authorization': f'Bearer {api_key}' 
     }
     
     # Payload
@@ -65,11 +71,8 @@ def send_sms_wigal(phone, message):
     }
     
     try:
-        # Some versions pass credentials in payload, let's try standard POST first
         response = requests.post(url, json=payload, headers=headers)
-        
-        # Fallback: If 401, try query params or different payload structure if needed
-        # But for now, we follow the common header pattern
+        print(f"SMS Response: {response.text}") # Debug log
     except Exception as e:
         print(f"SMS Failed: {e}")
 
@@ -77,10 +80,9 @@ def search_books(request):
     """HTMX view for searching books."""
     query = request.GET.get('q', '')
     category = request.GET.get('category', '')
-    
     filter_type = request.GET.get('filter_type', 'all')
     
-    books = Book.objects.all()
+    books = Book.objects.all().order_by('-book_id')
     
     if query:
         if filter_type == 'title':
@@ -99,7 +101,13 @@ def search_books(request):
     if category:
         books = books.filter(keywords__icontains=category)
         
-    context = {'books': books}
+    # Pagination
+    from django.core.paginator import Paginator
+    paginator = Paginator(books, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+        
+    context = {'books': page_obj}
     return render(request, 'library/partials/book_list.html', context)
 
 def suggest_books(request):
