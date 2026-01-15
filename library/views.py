@@ -520,6 +520,7 @@ def submit_request(request):
 
         # Create Request
         req = BookRequest.objects.create(
+            member=member, # Link Relational Data
             full_name=f"{member.firstname} {member.surname}",
             email=member.email,
             book=book,
@@ -564,3 +565,65 @@ def submit_request(request):
         return redirect('index')
         
     return redirect('index')
+
+@staff_member_required
+def admin_dashboard_view(request):
+    """
+    Detailed Analytics Dashboard for Stats & Insights.
+    """
+    # 1. KPI Counts
+    total_requests = BookRequest.objects.count()
+    approved_count = BookRequest.objects.filter(approval_status='Approved').count()
+    pending_count = BookRequest.objects.filter(approval_status='Pending').count()
+    active_members = Member.objects.count() # Total database members
+
+    # 2. Top Books (Most Requested)
+    top_books = BookRequest.objects.values('book__title').annotate(count=Count('id')).order_by('-count')[:5]
+
+    # 3. Top Members (Most Active)
+    top_members = BookRequest.objects.values('full_name').annotate(count=Count('id')).order_by('-count')[:5]
+
+    # 4. Pie Chart Data (Status Distribution)
+    status_counts = BookRequest.objects.values('approval_status').annotate(count=Count('id'))
+    pie_labels = [item['approval_status'] for item in status_counts]
+    pie_data = [item['count'] for item in status_counts]
+
+    # 5. Line Chart (Requests over last 30 days)
+    # Group by date
+    last_30_days = timezone.now() - timedelta(days=30)
+    
+    # SQLite/Postgres date truncation varies. 
+    # For safety/portability, we'll fetch and process in python (if dataset is small < 10k) OR use distinct logic.
+    daily_qs = BookRequest.objects.filter(timestamp__gte=last_30_days).values_list('timestamp', flat=True)
+    
+    # Process dates
+    from collections import defaultdict
+    date_map = defaultdict(int)
+    for ts in daily_qs:
+        date_str = ts.strftime('%Y-%m-%d')
+        date_map[date_str] += 1
+        
+    # Generate continuous timeline
+    time_labels = []
+    time_data = []
+    current = last_30_days
+    while current <= timezone.now():
+        d_str = current.strftime('%Y-%m-%d')
+        time_labels.append(d_str)
+        time_data.append(date_map[d_str])
+        current += timedelta(days=1)
+
+    context = {
+        'total_requests': total_requests,
+        'approved_count': approved_count,
+        'pending_count': pending_count,
+        'active_members': active_members,
+        'top_books': top_books,
+        'top_members': top_members,
+        'pie_labels': pie_labels,
+        'pie_data': pie_data,
+        'time_labels': time_labels,
+        'time_data': time_data,
+        'title': 'Analytics Dashboard'
+    }
+    return render(request, 'admin_dashboard.html', context)

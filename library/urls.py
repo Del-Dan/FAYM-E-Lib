@@ -10,4 +10,5 @@ urlpatterns = [
     path('suggest-books/', views.suggest_books, name='suggest_books'),
     path('send-otp/', views.send_otp, name='send_otp'),
     path('verify-otp/', views.verify_otp_action, name='verify_otp'),
+    path('dashboard/', views.admin_dashboard_view, name='admin_dashboard'),
 ]

@@ -109,9 +109,15 @@ class BookRequest(models.Model):
 
     timestamp = models.DateTimeField(auto_now_add=True)
     token = models.CharField(max_length=50, unique=True, default=uuid.uuid4)
+    
+    # Link to actual Member record for relational integrity
+    member = models.ForeignKey(Member, on_delete=models.SET_NULL, null=True, blank=True, related_name='requests')
+    
+    # Legacy/Fallback string fields (keep for history)
     full_name = models.CharField(max_length=200)
     email = models.EmailField()
-    book = models.ForeignKey(Book, on_delete=models.SET_NULL, null=True)
+    
+    book = models.ForeignKey(Book, on_delete=models.CASCADE)
     request_status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default='Valid')
     approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS_CHOICES, default='Pending')
     approval_date = models.DateTimeField(null=True, blank=True)
