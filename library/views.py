@@ -178,6 +178,7 @@ def bulk_import(request):
                     reader = csv.DictReader(decoded_file)
                     updated = 0
                     created = 0
+                    skipped_no_link = 0
                     
                     for row in reader:
                         title = row.get('Title', '').strip()
@@ -194,21 +195,25 @@ def bulk_import(request):
                              books = Book.objects.filter(title__icontains=title)
                              
                         # 2. If no book found AND we have a link, CREATE IT
-                        if not books.exists() and share_link:
-                            try:
-                                Book.objects.create(
-                                    title=title,
-                                    author=author or 'Unknown',
-                                    keywords=keywords,
-                                    location=share_link,
-                                    cover_url=cover_url,
-                                    type='SC',
-                                    owner='FAYM',
-                                    availability='Available'
-                                )
-                                created += 1
+                        if not books.exists():
+                            if share_link:
+                                try:
+                                    Book.objects.create(
+                                        title=title,
+                                        author=author or 'Unknown',
+                                        keywords=keywords,
+                                        location=share_link,
+                                        cover_url=cover_url,
+                                        type='SC',
+                                        owner='FAYM',
+                                        availability='Available'
+                                    )
+                                    created += 1
+                                    continue
+                                except: pass
+                            else:
+                                skipped_no_link += 1
                                 continue
-                            except: pass
                             
                         # 3. Update existing books
                         for book in books:
@@ -230,7 +235,10 @@ def bulk_import(request):
                                 book.save()
                                 updated += 1
                                 
-                    messages.success(request, f"Process Complete. Created: {created}, Updated: {updated} books.")
+                    msg = f"Process Complete. Created: {created}, Updated: {updated}."
+                    if skipped_no_link > 0:
+                        msg += f" Skipped {skipped_no_link} new books (Missing 'Shareable Link')."
+                    messages.success(request, msg)
                 except Exception as e:
                     messages.error(request, f"Metadata Update Error: {e}")
 
