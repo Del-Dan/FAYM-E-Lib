@@ -78,20 +78,44 @@ def search_books(request):
     query = request.GET.get('q', '')
     category = request.GET.get('category', '')
     
+    filter_type = request.GET.get('filter_type', 'all')
+    
     books = Book.objects.all()
     
     if query:
-        books = books.filter(
-            Q(title__icontains=query) | 
-            Q(author__icontains=query) |
-            Q(keywords__icontains=query)
-        )
+        if filter_type == 'title':
+            books = books.filter(title__icontains=query)
+        elif filter_type == 'author':
+            books = books.filter(author__icontains=query)
+        elif filter_type == 'keywords':
+             books = books.filter(keywords__icontains=query)
+        else:
+            books = books.filter(
+                Q(title__icontains=query) | 
+                Q(author__icontains=query) |
+                Q(keywords__icontains=query)
+            )
     
     if category:
         books = books.filter(keywords__icontains=category)
         
     context = {'books': books}
     return render(request, 'library/partials/book_list.html', context)
+
+def suggest_books(request):
+    """HTMX view for search suggestions."""
+    query = request.GET.get('q', '')
+    if len(query) < 2:
+        return HttpResponse('')
+        
+    # Get top 5 matches
+    books = Book.objects.filter(title__icontains=query)[:5]
+    
+    options = ""
+    for book in books:
+        options += f'<option value="{book.title}"></option>'
+    
+    return HttpResponse(options)
 
 def check_member(request):
     """HTMX/API check if member exists."""
@@ -309,8 +333,6 @@ def submit_request(request):
             try:
                 send_mail(f"Received: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
             except: pass
-            
-        messages.success(request, f"Request received! Token: {req.token}")
             
         messages.success(request, f"Request received! Token: {req.token}")
         return redirect('index')

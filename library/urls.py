@@ -7,4 +7,5 @@ urlpatterns = [
     path('check-member/', views.check_member, name='check_member'),
     path('request/', views.submit_request, name='submit_request'),
     path('bulk-import/', views.bulk_import, name='bulk_import'),
+    path('suggest-books/', views.suggest_books, name='suggest_books'),
 ]
