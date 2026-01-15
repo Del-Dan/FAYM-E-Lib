@@ -1,0 +1,13 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+<div style="margin-bottom: 20px; padding: 15px; background: #e0e7ff; border: 1px solid #c7d2fe; border-radius: 8px;">
+    <h2 style="margin-top: 0; color: #3730a3;">🚀 Bulk Import Tools</h2>
+    <p style="color: #4338ca;">Use the dashboard to import Members (CSV), Sync Dropbox Books, and Update Metadata.</p>
+    <a href="/bulk-import/"
+        style="display: inline-block; background: #4f46e5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+        Go to Import Dashboard &rarr;
+    </a>
+</div>
+{{ block.super }}
+{% endblock %}
