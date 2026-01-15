@@ -100,12 +100,17 @@
     </div>
 </div>
 
+{{ time_labels|json_script:"time-labels-data" }}
+{{ time_data|json_script:"time-data-data" }}
+{{ pie_data|json_script:"pie-data-data" }}
+{{ pie_labels|json_script:"pie-labels-data" }}
+
 <script>
     // Config Data from Django
-    const timeLabels = {{ time_labels| safe }};
-    const timeData = {{ time_data| safe }};
-    const pieData = {{ pie_data| safe }};
-    const pieLabels = {{ pie_labels| safe }};
+    const timeLabels = JSON.parse(document.getElementById('time-labels-data').textContent);
+    const timeData = JSON.parse(document.getElementById('time-data-data').textContent);
+    const pieData = JSON.parse(document.getElementById('pie-data-data').textContent);
+    const pieLabels = JSON.parse(document.getElementById('pie-labels-data').textContent);
 
     // Line Chart
     new Chart(document.getElementById('timeChart'), {
