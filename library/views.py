@@ -14,7 +14,8 @@ import uuid
 def index(request):
     """Main landing page with search."""
     books = Book.objects.all().order_by('-book_id')[:20] # Show recent
-    return render(request, 'library/index.html', {'books': books})
+    categories = ["Faith", "Love", "Leadership", "Prayer", "Fiction", "Finance"]
+    return render(request, 'library/index.html', {'books': books, 'categories': categories})
 
 def search_books(request):
     """HTMX view for searching books."""

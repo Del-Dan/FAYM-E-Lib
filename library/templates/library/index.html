@@ -25,7 +25,7 @@
     <!-- Category Pills -->
     <div class="flex flex-wrap justify-center gap-2 mb-12">
         <input type="hidden" name="category" x-model="category">
-        {% for cat in "Faith,Love,Leadership,Prayer,Fiction,Finance"|make_list %} <!-- Simple manual list for demo -->
+        {% for cat in categories %}
         <button
             @click="category = category === '{{ cat }}' ? '' : '{{ cat }}'; $nextTick(() => htmx.trigger($el, 'change'))"
             :class="category === '{{ cat }}' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'"

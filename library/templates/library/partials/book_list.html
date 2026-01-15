@@ -3,30 +3,51 @@
 <div
     class="bg-white rounded-xl shadow-sm hover:shadow-xl transition-shadow duration-300 border border-slate-100 overflow-hidden group flex flex-col h-full">
     <div class="p-6 flex-1">
-        <div class="flex justify-between items-start mb-4">
-            <span
-                class="px-2 py-1 rounded text-xs font-bold uppercase tracking-wider 
-                    {% if book.type == 'SC' %}bg-purple-100 text-purple-700{% else %}bg-amber-100 text-amber-700{% endif %}">
-                {{ book.get_type_display }}
-            </span>
-            <span
-                class="flex items-center space-x-1 text-xs font-medium 
-                    {% if book.is_available %}text-green-600 bg-green-50 px-2 py-0.5 rounded-full{% else %}text-red-600 bg-red-50 px-2 py-0.5 rounded-full{% endif %}">
-                <span
-                    class="w-2 h-2 rounded-full {% if book.is_available %}bg-green-500{% else %}bg-red-500{% endif %}"></span>
-                <span>{{ book.get_availability_display }}</span>
-            </span>
-        </div>
+        <div class="flex gap-4">
+            <!-- Cover Image -->
+            <div
+                class="w-20 h-28 bg-slate-100 rounded-md shadow-sm flex-shrink-0 overflow-hidden relative group-hover:scale-105 transition-transform duration-300">
+                {% if book.cover_url %}
+                <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="w-full h-full object-cover">
+                {% else %}
+                <div class="w-full h-full flex items-center justify-center text-slate-300 bg-slate-200">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253">
+                        </path>
+                    </svg>
+                </div>
+                {% endif %}
+            </div>
 
-        <h3 class="text-xl font-bold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors line-clamp-2">{{
-            book.title }}</h3>
-        <p class="text-slate-500 text-sm mb-4">{{ book.author }}</p>
+            <div class="flex-1 min-w-0">
+                <div class="flex justify-between items-start mb-2">
+                    <span
+                        class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider {% if book.type == 'SC' %}bg-purple-100 text-purple-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+                        {{ book.type }}
+                    </span>
+                    <span
+                        class="flex items-center space-x-1 text-[10px] font-medium {% if book.is_available %}text-green-600 bg-green-50 px-2 py-0.5 rounded-full{% else %}text-red-600 bg-red-50 px-2 py-0.5 rounded-full{% endif %}">
+                        <span
+                            class="w-1.5 h-1.5 rounded-full {% if book.is_available %}bg-green-500{% else %}bg-red-500{% endif %}"></span>
+                        <span>{{ book.availability }}</span>
+                    </span>
+                </div>
 
-        <div class="flex flex-wrap gap-1 mb-4">
-            {% for tag in book.keywords.split|slice:":3" %}
-            <!-- Basic split, assume comma not handled in template well without tag, but split works on space default, for comma use custom filter if needed, using simple logic here -->
-            <span class="text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">{{ tag }}</span>
-            {% endfor %}
+                <h3
+                    class="text-lg font-bold text-slate-900 mb-1 leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">
+                    {{ book.title }}
+                </h3>
+                <p class="text-sm text-slate-500 truncate mb-2">{{ book.author }}</p>
+
+                <div class="flex flex-wrap gap-1">
+                    {% for tag in book.keywords.split|slice:":2" %}
+                    <span
+                        class="text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">{{
+                        tag }}</span>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
     </div>
 

@@ -41,6 +41,7 @@ class Book(models.Model):
     
     # Virtual field for uploading
     file_upload = models.FileField(upload_to='temp_books/', blank=True, null=True, help_text="Upload SC file here. It will be moved to Dropbox.")
+    cover_url = models.URLField(blank=True, null=True, help_text="URL to book cover image")
 
     def __str__(self):
         return self.title
