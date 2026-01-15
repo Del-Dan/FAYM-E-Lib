@@ -61,8 +61,67 @@
 </div>
 
 <!-- Request Modal (Global) - Utilizing Alpine for state -->
-<div x-data="{ open: false, bookId: '', bookTitle: '', identity: '', isValid: false }"
-    @open-request-modal.window="open = true; bookId = $event.detail.id; bookTitle = $event.detail.title; isValid = false; identity = '';"
+<!-- Request Modal (Global) - Multi-step OTP Flow -->
+<div x-data="{ 
+    open: false, 
+    step: 1, 
+    bookId: '', 
+    bookTitle: '', 
+    identity: '', 
+    otpCode: '', 
+    isValidMember: false, 
+    isLoading: false,
+    csrf: document.querySelector('[name=csrfmiddlewaretoken]').value,
+    
+    reset() {
+        this.step = 1;
+        this.identity = '';
+        this.otpCode = '';
+        this.isValidMember = false;
+        this.isLoading = false;
+    },
+    
+    async checkMember() {
+        if (this.identity.length < 3) return;
+        let res = await fetch(`{% url 'check_member' %}?identity=${this.identity}`);
+        let data = await res.json();
+        this.isValidMember = data.valid;
+    },
+    
+    async sendOtp() {
+        this.isLoading = true;
+        let fd = new FormData();
+        fd.append('identity', this.identity);
+        fd.append('csrfmiddlewaretoken', this.csrf);
+        
+        let res = await fetch(`{% url 'send_otp' %}`, { method: 'POST', body: fd });
+        let data = await res.json();
+        this.isLoading = false;
+        
+        if (data.status === 'sent') {
+            this.step = 2; // Move to OTP entry
+        } else {
+            alert(data.message);
+        }
+    },
+    
+    async verifyOtp() {
+        this.isLoading = true;
+        let fd = new FormData();
+        fd.append('otp_code', this.otpCode);
+        fd.append('csrfmiddlewaretoken', this.csrf);
+        
+        let res = await fetch(`{% url 'verify_otp' %}`, { method: 'POST', body: fd });
+        let data = await res.json();
+        this.isLoading = false;
+        
+        if (data.status === 'success') {
+            this.step = 3; // Ready to submit
+        } else {
+            alert(data.message);
+        }
+    }
+}" @open-request-modal.window="open = true; bookId = $event.detail.id; bookTitle = $event.detail.title; reset();"
     x-show="open" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition.opacity>
 
     <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" @click="open = false"></div>
@@ -75,31 +134,69 @@
             <p class="text-slate-500 mb-6">Requesting: <span class="font-semibold text-slate-800"
                     x-text="bookTitle"></span></p>
 
-            <form action="{% url 'submit_request' %}" method="POST" class="space-y-4">
+            <form action="{% url 'submit_request' %}" method="POST" class="space-y-4" @submit="isLoading = true">
                 {% csrf_token %}
                 <input type="hidden" name="book_id" x-model="bookId">
 
-                <div>
+                <!-- Step 1: Identity -->
+                <div x-show="step === 1" x-transition>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Email or Mobile Number</label>
-                    <input type="text" name="identity" x-model="identity"
-                        @keyup.debounce.500ms="fetch(`{% url 'check_member' %}?identity=${identity}`).then(r => r.json()).then(d => isValid = d.valid)"
-                        class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                        placeholder="e.g. john@example.com" required>
+                    <input type="text" name="identity" x-model="identity" @keyup.debounce.500ms="checkMember()"
+                        class="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="e.g. 055..." required>
+
                     <p x-show="identity.length > 3" class="text-xs mt-1"
-                        :class="isValid ? 'text-green-600' : 'text-red-500'"
-                        x-text="isValid ? 'Member Verified' : 'Checking... (Must be a registered member)'"></p>
-                </div>
+                        :class="isValidMember ? 'text-green-600' : 'text-red-500'"
+                        x-text="isValidMember ? 'Member Verified' : 'Checking...'"></p>
 
-                <div x-show="isValid" x-transition>
-                    <button type="submit"
-                        class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-0.5">
-                        Submit Request
+                    <button type="button" x-show="isValidMember" @click="sendOtp()" :disabled="isLoading"
+                        class="w-full mt-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors">
+                        <span x-show="!isLoading">Verify Identity</span>
+                        <span x-show="isLoading">Sending OTP...</span>
                     </button>
+
+                    <div x-show="!isValidMember && identity.length > 8" class="mt-2 text-sm text-red-500">
+                        Member not found. Check digits or register.
+                    </div>
                 </div>
 
-                <div x-show="!isValid && identity.length > 5" x-transition
-                    class="text-center p-4 bg-orange-50 rounded-lg border border-orange-100">
-                    <p class="text-sm text-orange-800">We couldn't verify your membership.</p>
+                <!-- Step 2: OTP Entry -->
+                <div x-show="step === 2" x-transition style="display: none;">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Enter OTP Code</label>
+                    <input type="text" x-model="otpCode"
+                        class="w-full px-4 py-2 text-center text-2xl tracking-widest rounded-lg border border-slate-300 focus:ring-blue-500 outline-none"
+                        placeholder="000000" maxlength="6">
+
+                    <div class="flex gap-2 mt-4">
+                        <button type="button" @click="step = 1"
+                            class="flex-1 py-2 border border-slate-300 rounded-lg text-slate-600">Back</button>
+                        <button type="button" @click="verifyOtp()" :disabled="isLoading || otpCode.length < 4"
+                            class="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                            <span x-show="!isLoading">Verify Code</span>
+                            <span x-show="isLoading">Verifying...</span>
+                        </button>
+                    </div>
+                    <p class="text-xs text-center text-slate-400 mt-2">Check your SMS.</p>
+                </div>
+
+                <!-- Step 3: Final Submit -->
+                <div x-show="step === 3" x-transition style="display: none;">
+                    <div class="text-center mb-4">
+                        <div class="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-2">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-medium text-green-800">Identity Verified</h3>
+                        <p class="text-sm text-slate-500">Session valid for 30 minutes.</p>
+                    </div>
+
+                    <button type="submit" :disabled="isLoading"
+                        class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg disabled:opacity-50">
+                        <span x-show="!isLoading">Confirm Request</span>
+                        <span x-show="isLoading">Processing...</span>
+                    </button>
                 </div>
             </form>
 

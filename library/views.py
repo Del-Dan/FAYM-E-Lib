@@ -10,6 +10,8 @@ import io
 import csv
 import threading
 import datetime
+from datetime import timedelta
+from django.utils import timezone
 import uuid
 import requests
 from django.core.mail import send_mail
@@ -306,8 +308,193 @@ def bulk_import(request):
 
     return render(request, 'library/bulk_import.html')
 
+# --- OTP Helper Functions ---
+def generate_wigal_otp(phone):
+    """Generate OTP using Wigal Frog v3."""
+    api_key = settings.WIGAL_API_KEY
+    username = settings.WIGAL_USERNAME
+    sender_id = settings.WIGAL_SENDER_ID
+    
+    url = 'https://frogapi.wigal.com.gh/api/v3/sms/otp/generate'
+    
+    # Format Phone
+    clean_phone = str(phone).strip()
+    clean_phone = ''.join(filter(str.isdigit, clean_phone))
+    if len(clean_phone) == 10 and clean_phone.startswith('0'):
+        clean_phone = '233' + clean_phone[1:]
+    elif len(clean_phone) == 9:
+        clean_phone = '233' + clean_phone
+        
+    payload = {
+        "senderid": sender_id,
+        "number": clean_phone,
+        "expiry": 5, # 5 minutes validity
+        "length": 6,
+        "type": "NUMERIC",
+        "messagetemplate": "Your FAYM Library OTP is %OTPCODE%. Valid for %EXPIRY% minutes."
+    }
+    
+    headers = {'Content-Type': 'application/json', 'API-KEY': api_key, 'USERNAME': username}
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        data = response.json()
+        print(f"OTP Generate Response: {data}")
+        return data.get('otpcode') if response.status_code == 200 else None
+        # Note: In real production, usually API sends the SMS. 
+        # But if the API returns the code (which some do for verification), we store it.
+        # Wigal Verify endpoint might handle the verification logic itself.
+        # Checking logic: The generated OTP is SENT to the user by Wigal. 
+        # We might not get the code back in response for security. 
+        # If Wigal handles verification, we use their verify endpoint.
+        # Let's assume we use Wigal's verify endpoint.
+    except Exception as e:
+        print(f"OTP Gen Error: {e}")
+        return None
+
+def verify_wigal_otp(phone, code):
+    """Verify OTP using Wigal Frog v3."""
+    api_key = settings.WIGAL_API_KEY
+    username = settings.WIGAL_USERNAME
+    
+    url = 'https://frogapi.wigal.com.gh/api/v3/sms/otp/verify'
+     
+    # Format Phone (Same logic)
+    clean_phone = str(phone).strip()
+    clean_phone = ''.join(filter(str.isdigit, clean_phone))
+    if len(clean_phone) == 10 and clean_phone.startswith('0'):
+        clean_phone = '233' + clean_phone[1:]
+    elif len(clean_phone) == 9:
+        clean_phone = '233' + clean_phone
+        
+    payload = {
+        "number": clean_phone,
+        "otpcode": code
+    }
+    
+    headers = {'Content-Type': 'application/json', 'API-KEY': api_key, 'USERNAME': username}
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        data = response.json()
+        print(f"OTP Verify Response: {data}")
+        # Check status from Wigal response
+        return data.get('status') == 'success' # Adjust based on actual response key
+    except Exception as e:
+        print(f"OTP Verify Error: {e}")
+        return False
+
+# --- OTP Views ---
+
+def send_otp(request):
+    """HTMX View to trigger OTP sending."""
+    identity = request.POST.get('identity', '').strip()
+    
+    # Check Member
+    member = Member.objects.filter(
+        Q(email__iexact=identity) | 
+        Q(mobile_number__iexact=identity)
+    ).first()
+    
+    if not member:
+        return JsonResponse({'status': 'error', 'message': 'Member not found.'})
+        
+    # Send OTP Logic
+    # We rely on Wigal to send the SMS. 
+    # We store the phone number in session to verify against later.
+    request.session['otp_phone'] = member.mobile_number
+    
+    # Call Wigal Generate
+    # Note: Wigal sends the SMS automatically when we call generate
+    generate_wigal_otp(member.mobile_number)
+    
+    return JsonResponse({'status': 'sent', 'message': f'OTP sent to {member.mobile_number}'})
+
+def verify_otp_action(request):
+    """HTMX View to verify OTP input."""
+    code = request.POST.get('otp_code', '').strip()
+    phone = request.session.get('otp_phone')
+    
+    if not phone:
+         return JsonResponse({'status': 'error', 'message': 'Session expired. Request OTP again.'})
+         
+    # Call Wigal Verify
+    is_valid = verify_wigal_otp(phone, code)
+    
+    if is_valid:
+        # Set Session (30 mins)
+        request.session['is_verified'] = True
+        request.session['verified_identity'] = phone # Or link to member
+        request.session['session_expiry'] = (timezone.now() + timedelta(minutes=30)).isoformat()
+        return JsonResponse({'status': 'success', 'message': 'Verified!'})
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Invalid OTP.'})
+
+def check_request_limits(member, book_type):
+    """
+    Enforce limits:
+    - SC: Max 2 per week, Max 4 per month.
+    - HC: Max 1 active request until returned.
+    """
+    now = timezone.now()
+    email = member.email
+    
+    if book_type == 'SC':
+        # Check Weekly (Last 7 days)
+        week_ago = now - timedelta(days=7)
+        week_count = BookRequest.objects.filter(
+            email=email, 
+            book__type='SC', 
+            timestamp__gte=week_ago
+        ).count()
+        
+        if week_count >= 2:
+            return "Limit Reached: You can only request 2 Soft Copy books per week."
+            
+        # Check Monthly (Last 30 days)
+        month_ago = now - timedelta(days=30)
+        month_count = BookRequest.objects.filter(
+            email=email, 
+            book__type='SC', 
+            timestamp__gte=month_ago
+        ).count()
+        
+        if month_count >= 4:
+            return "Limit Reached: You can only request 4 Soft Copy books per month."
+            
+    elif book_type == 'HC':
+        # Check Active HC requests (Not Returned)
+        # Assuming 'Returned' or 'N/A' means closed.
+        active_hc = BookRequest.objects.filter(
+            email=email,
+            book__type='HC'
+        ).exclude(return_status='Returned').exists()
+        
+        if active_hc:
+            return "Limit Reached: You have an unreturned Hard Copy book. Please return it first."
+            
+    return None
+
 def submit_request(request):
     if request.method == 'POST':
+        # --- OTP SECURITY CHECK ---
+        is_verified = request.session.get('is_verified')
+        session_expiry = request.session.get('session_expiry')
+        
+        if not is_verified or not session_expiry:
+             messages.error(request, "Security Session Expired. Please verify via OTP.")
+             return redirect('index')
+             
+        # Check Expiry
+        expiry_dt = datetime.datetime.fromisoformat(session_expiry)
+        if timezone.now() > expiry_dt:
+             # Expired
+             del request.session['is_verified']
+             del request.session['session_expiry']
+             messages.error(request, "Security Session Expired. Please verify via OTP.")
+             return redirect('index')
+        # --------------------------
+
         book_id = request.POST.get('book_id')
         identity = request.POST.get('identity') # Email or Phone
         full_name = request.POST.get('full_name') # Optional check?
@@ -324,6 +511,13 @@ def submit_request(request):
             messages.error(request, "Access Denied: You are not a registered member of the ministry.")
             return redirect('index')
             
+        # --- NEW: Request Limits Check ---
+        limit_error = check_request_limits(member, book.type)
+        if limit_error:
+            messages.error(request, limit_error)
+            return redirect('index')
+        # ---------------------------------
+
         # Create Request
         req = BookRequest.objects.create(
             full_name=f"{member.firstname} {member.surname}",

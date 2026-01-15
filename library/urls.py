@@ -8,4 +8,6 @@ urlpatterns = [
     path('request/', views.submit_request, name='submit_request'),
     path('bulk-import/', views.bulk_import, name='bulk_import'),
     path('suggest-books/', views.suggest_books, name='suggest_books'),
+    path('send-otp/', views.send_otp, name='send_otp'),
+    path('verify-otp/', views.verify_otp_action, name='verify_otp'),
 ]
