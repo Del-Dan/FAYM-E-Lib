@@ -40,7 +40,7 @@ def index(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    if request.htmx:
+    if request.headers.get('HX-Request'):
         return render(request, 'library/partials/book_list.html', {'books': page_obj})
 
     return render(request, 'library/index.html', {'books': page_obj, 'categories': categories})
