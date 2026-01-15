@@ -13,13 +13,14 @@ import datetime
 import uuid
 import requests
 from django.core.mail import send_mail
+from django.core.paginator import Paginator
 
 from django.db.models import Count
 from collections import Counter
 
 def index(request):
     """Main landing page with search and dynamic categories."""
-    books = Book.objects.all().order_by('-book_id')[:20]
+    books = Book.objects.all().order_by('-book_id')
     
     # Aggregate all keywords
     all_books = Book.objects.values_list('keywords', flat=True)
@@ -32,11 +33,9 @@ def index(request):
             keyword_counter.update(parts)
             
     # Get top 15 most common categories
-    # Get top 15 most common categories
     categories = [k for k, v in keyword_counter.most_common(15)]
     
     # Pagination
-    from django.core.paginator import Paginator
     paginator = Paginator(books, 20) # Show 20 contacts per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -101,8 +100,10 @@ def search_books(request):
     if category:
         books = books.filter(keywords__icontains=category)
         
+    if category:
+        books = books.filter(keywords__icontains=category)
+        
     # Pagination
-    from django.core.paginator import Paginator
     paginator = Paginator(books, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
