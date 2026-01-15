@@ -38,6 +38,7 @@ CSRF_TRUSTED_ORIGINS = ['https://*.railway.app']
 # Application definition
 
 INSTALLED_APPS = [
+    'library',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -45,7 +46,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'whitenoise.runserver_nostatic',
     'django.contrib.staticfiles',
-    'library',
 ]
 
 MIDDLEWARE = [
