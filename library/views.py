@@ -11,6 +11,8 @@ import csv
 import threading
 import datetime
 import uuid
+import requests
+from django.core.mail import send_mail
 
 from django.db.models import Count
 from collections import Counter
@@ -33,6 +35,28 @@ def index(request):
     categories = [k for k, v in keyword_counter.most_common(15)]
     
     return render(request, 'library/index.html', {'books': books, 'categories': categories})
+
+def send_sms_wigal(phone, message):
+    """Send SMS using Wigal API."""
+    api_key = settings.WIGAL_API_KEY
+    sender_id = settings.WIGAL_SENDER_ID
+    
+    if not api_key:
+        print("WIGAL_API_KEY not set. SMS skipped.")
+        return
+
+    url = 'https://logon.wigal.com.gh/api/v2/sendmsg'
+    payload = {
+        "sender_id": sender_id,
+        "phone": phone,
+        "message": message
+    }
+    
+    try:
+        response = requests.post(url, json=payload, headers={'Authorization': f'Bearer {api_key}'})
+        # print(f"SMS Response: {response.text}")
+    except Exception as e:
+        print(f"SMS Failed: {e}")
 
 def search_books(request):
     """HTMX view for searching books."""
@@ -186,8 +210,19 @@ def submit_request(request):
         
         # Automations (SC auto-approve placeholder)
         if book.type == 'SC':
-            # Logic to send email would go here
-            pass
+            # 1. Send Email
+            subject = f"Book Request Received: {book.title}"
+            msg_body = f"Hello {member.firstname},\n\nWe received your request for '{book.title}'.\nWe will notify you once approved.\n\nFAYM Library"
+            
+            try:
+                send_mail(subject, msg_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
+            except Exception as e:
+                print(f"Email Failed: {e}")
+
+            # 2. Send SMS
+            sms_msg = f"Hi {member.firstname}, request for {book.title} received. FAYM Lib"
+            # Note: Ensure mobile number is formatted correctly (e.g., 233...) if Wigal requires specific format
+            send_sms_wigal(member.mobile_number, sms_msg)
             
         messages.success(request, f"Request received! Token: {req.token}")
         return redirect('index')
