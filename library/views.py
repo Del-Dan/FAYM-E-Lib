@@ -168,7 +168,7 @@ def bulk_import(request):
                 except Exception as e:
                     messages.error(request, f"Member Import Error: {e}")
 
-        elif action == 'update_metadata':
+        elif 'update_metadata' in request.POST:
             csv_file = request.FILES.get('csv_file')
             if not csv_file:
                 messages.error(request, "Please upload a CSV file.")
@@ -177,18 +177,60 @@ def bulk_import(request):
                     decoded_file = csv_file.read().decode('utf-8').splitlines()
                     reader = csv.DictReader(decoded_file)
                     updated = 0
+                    created = 0
+                    
                     for row in reader:
                         title = row.get('Title', '').strip()
                         if not title: continue
                         
-                        # Logic from command
-                        books = Book.objects.filter(title__icontains=title)
+                        share_link = row.get('Shareable Link', '').strip()
+                        cover_url = row.get('Cover URL', '').strip()
+                        author = row.get('Author', '').strip()
+                        keywords = row.get('Keywords', '').strip()
+                        
+                        # 1. Try to find existing book
+                        books = Book.objects.filter(title__iexact=title)
+                        if not books.exists():
+                             books = Book.objects.filter(title__icontains=title)
+                             
+                        # 2. If no book found AND we have a link, CREATE IT
+                        if not books.exists() and share_link:
+                            try:
+                                Book.objects.create(
+                                    title=title,
+                                    author=author or 'Unknown',
+                                    keywords=keywords,
+                                    location=share_link,
+                                    cover_url=cover_url,
+                                    type='SC',
+                                    owner='FAYM',
+                                    availability='Available'
+                                )
+                                created += 1
+                                continue
+                            except: pass
+                            
+                        # 3. Update existing books
                         for book in books:
-                            book.author = row.get('Author', book.author)
-                            book.keywords = row.get('Keywords', book.keywords)
-                            book.save()
-                            updated += 1
-                    messages.success(request, f"Updated metadata for {updated} books.")
+                            changed = False
+                            if author: 
+                                book.author = author
+                                changed = True
+                            if keywords: 
+                                book.keywords = keywords
+                                changed = True
+                            if share_link and not book.location:
+                                book.location = share_link
+                                changed = True
+                            if cover_url and not book.cover_url:
+                                book.cover_url = cover_url
+                                changed = True
+                                
+                            if changed:
+                                book.save()
+                                updated += 1
+                                
+                    messages.success(request, f"Process Complete. Created: {created}, Updated: {updated} books.")
                 except Exception as e:
                     messages.error(request, f"Metadata Update Error: {e}")
 
