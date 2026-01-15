@@ -34,6 +34,7 @@ class Command(BaseCommand):
                         changed = False
                         author = row.get('Author', '').strip()
                         keywords = row.get('Keywords', '').strip()
+                        cover_url = row.get('Cover URL', '').strip()
                         
                         if author and book.author in ['Unknown', 'Unknown Import']:
                             book.author = author
@@ -41,6 +42,10 @@ class Command(BaseCommand):
                         
                         if keywords and not book.keywords:
                             book.keywords = keywords
+                            changed = True
+
+                        if cover_url and not book.cover_url:
+                            book.cover_url = cover_url
                             changed = True
                             
                         if changed:
