@@ -58,8 +58,19 @@ def send_sms_wigal(phone, message):
     # User provided working "Frog" API v3 URL
     url = 'https://frogapi.wigal.com.gh/api/v3/sms/send'
     
-    # Clean phone number (simple logic: remove +)
-    clean_phone = str(phone).replace('+', '').strip()
+    # Intelligent Number Formatting
+    # 1. Strip all non-digits (keep length checks clean)
+    raw_phone = str(phone).strip()
+    clean_phone = ''.join(filter(str.isdigit, raw_phone))
+    
+    # 2. Logic for Ghana Numbers
+    if len(clean_phone) == 10 and clean_phone.startswith('0'):
+        # e.g. 0554020123 -> 233554020123
+        clean_phone = '233' + clean_phone[1:]
+    elif len(clean_phone) == 9 and not clean_phone.startswith('0'):
+        # e.g. 554020123 -> 233554020123
+        clean_phone = '233' + clean_phone
+    # else: leave as-is (e.g. already 233... or foreign number)
     
     headers = {
         'Content-Type': 'application/json',
