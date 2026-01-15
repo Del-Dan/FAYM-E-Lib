@@ -24,10 +24,32 @@ class Command(BaseCommand):
                     if not title:
                         continue
                         
+                    
                     # Fuzzy match or exact match? Let's try exact first, then icontains
                     books = Book.objects.filter(title__iexact=title)
                     if not books.exists():
-                        # Try partial match (Dropbox filenames might vary slightly)
+                        # CHECK FOR CREATION: If we have a Link, we can create it
+                        share_link = row.get('Shareable Link', '').strip()
+                        if share_link:
+                            try:
+                                Book.objects.create(
+                                    title=title,
+                                    author=row.get('Author', 'Unknown'),
+                                    keywords=row.get('Keywords', ''),
+                                    location=share_link,
+                                    cover_url=row.get('Cover URL', ''),
+                                    type='SC', # Default to Soft Copy
+                                    owner='FAYM',
+                                    availability='Available'
+                                )
+                                self.stdout.write(self.style.SUCCESS(f"Created New Book: {title}"))
+                                updated_count += 1
+                                continue
+                            except Exception as e:
+                                self.stdout.write(self.style.ERROR(f"Failed to create {title}: {e}"))
+                                continue
+                        
+                        # Try partial match if not creating
                         books = Book.objects.filter(title__icontains=title)
                     
                     for book in books:
@@ -35,6 +57,11 @@ class Command(BaseCommand):
                         author = row.get('Author', '').strip()
                         keywords = row.get('Keywords', '').strip()
                         cover_url = row.get('Cover URL', '').strip()
+                        share_link = row.get('Shareable Link', '').strip()
+                        
+                        if share_link and not book.location:
+                             book.location = share_link
+                             changed = True
                         
                         if author and book.author in ['Unknown', 'Unknown Import']:
                             book.author = author
