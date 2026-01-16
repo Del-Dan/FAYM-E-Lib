@@ -397,6 +397,81 @@ def send_otp(request):
     else:
         return JsonResponse({'status': 'error', 'message': 'System error sending OTP.'})
 
+def verify_otp_action(request):
+    """HTMX View to verify OTP input using Wigal or DB check."""
+    code = request.POST.get('otp_code', '').strip()
+    phone = request.session.get('otp_phone')
+    
+    if not phone:
+         return JsonResponse({'status': 'error', 'message': 'Session expired. Request OTP again.'})
+         
+    # DB Verification (Temporal)
+    record = OTPRecord.objects.filter(
+        phone_number=phone,
+        otp_code=code,
+        is_verified=False,
+        expires_at__gt=timezone.now()
+    ).first()
+    
+    if record:
+        record.is_verified = True
+        record.save()
+        
+        # Set Session (30 mins)
+        request.session['is_verified'] = True
+        request.session['verified_identity'] = phone
+        request.session['session_expiry'] = (timezone.now() + timedelta(minutes=30)).isoformat()
+        return JsonResponse({'status': 'success', 'message': 'Verified!'})
+    else:
+        # Fallback to Wigal Verify if needed?
+        # For now, stick to DB since send_otp uses DB.
+        return JsonResponse({'status': 'error', 'message': 'Invalid or Expired OTP.'})
+
+def check_request_limits(member, book_type):
+    """
+    Enforce limits:
+    - SC: Max 2 per week, Max 4 per month.
+    - HC: Max 1 active request until returned.
+    """
+    now = timezone.now()
+    email = member.email
+    
+    if book_type == 'SC':
+        # Check Weekly (Last 7 days)
+        week_ago = now - timedelta(days=7)
+        week_count = BookRequest.objects.filter(
+            email=email, 
+            book__type='SC', 
+            timestamp__gte=week_ago
+        ).count()
+        
+        if week_count >= 2:
+            return "Limit Reached: You can only request 2 Soft Copy books per week."
+            
+        # Check Monthly (Last 30 days)
+        month_ago = now - timedelta(days=30)
+        month_count = BookRequest.objects.filter(
+            email=email, 
+            book__type='SC', 
+            timestamp__gte=month_ago
+        ).count()
+        
+        if month_count >= 4:
+            return "Limit Reached: You can only request 4 Soft Copy books per month."
+            
+    elif book_type == 'HC':
+        # Check Active HC requests (Not Returned)
+        # Assuming 'Returned' or 'N/A' means closed.
+        active_hc = BookRequest.objects.filter(
+            email=email,
+            book__type='HC'
+        ).exclude(return_status='Returned').exists()
+        
+        if active_hc:
+            return "Limit Reached: You have an unreturned Hard Copy book. Please return it first."
+            
+    return None
+
 def submit_request(request):
     if request.method == 'POST':
         # --- OTP SECURITY CHECK ---
