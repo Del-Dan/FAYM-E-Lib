@@ -301,6 +301,39 @@
                 } finally {
                     this.isLoading = false;
                 }
+            },
+
+            async submitFinalRequest() {
+                this.isLoading = true;
+                let fd = new FormData();
+                fd.append('book_id', this.bookId);
+                fd.append('identity', this.identity);
+                fd.append('csrfmiddlewaretoken', this.csrf);
+
+                try {
+                    let res = await fetch(`{% url 'submit_request' %}`, { method: 'POST', body: fd });
+                    let data = await res.json();
+
+                    if (data.status === 'success') {
+                        // 1. Show Success Message
+                        this.showToast(data.message, 'success');
+
+                        // 2. Close Modal Immediatey
+                        this.open = false;
+
+                        // 3. Reset Form
+                        setTimeout(() => this.reset(), 500);
+
+                        // 4. Reload page (optional, to update book availability visually)
+                        // setTimeout(() => window.location.reload(), 1500); 
+                    } else {
+                        this.showToast(data.message, 'error');
+                    }
+                } catch (e) {
+                    this.showToast("Request failed. Try again.", 'error');
+                } finally {
+                    this.isLoading = false;
+                }
             }
         }));
     });

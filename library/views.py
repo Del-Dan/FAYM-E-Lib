@@ -473,22 +473,23 @@ def check_request_limits(member, book_type):
     return None
 
 def submit_request(request):
+    """
+    Submits the book request. Returns JSON for AJAX handling.
+    """
     if request.method == 'POST':
         # --- OTP SECURITY CHECK ---
         is_verified = request.session.get('is_verified')
         session_expiry = request.session.get('session_expiry')
         
         if not is_verified or not session_expiry:
-             messages.error(request, "Security Session Expired. Please verify via OTP.")
-             return redirect('index')
+             return JsonResponse({'status': 'error', 'message': 'Security Session Expired. Please verify via OTP.'})
              
         # Check Expiry
         expiry_dt = datetime.datetime.fromisoformat(session_expiry)
         if timezone.now() > expiry_dt:
              del request.session['is_verified']
              del request.session['session_expiry']
-             messages.error(request, "Security Session Expired. Please verify via OTP.")
-             return redirect('index')
+             return JsonResponse({'status': 'error', 'message': 'Security Session Expired. Please verify via OTP.'})
         # --------------------------
 
         book_id = request.POST.get('book_id')
@@ -500,18 +501,15 @@ def submit_request(request):
         member = Member.objects.filter(email__iexact=identity).first()
         
         if not member:
-            messages.error(request, "Authentication Error: Member profile not found.")
-            return redirect('index')
+            return JsonResponse({'status': 'error', 'message': 'Authentication Error: Member profile not found.'})
             
-        # --- NEW: Request Limits Check ---
+        # --- Request Limits Check ---
         limit_error = check_request_limits(member, book.type)
         if limit_error:
-            messages.error(request, limit_error)
-            return redirect('index')
+            return JsonResponse({'status': 'error', 'message': limit_error})
         # ---------------------------------
 
         # Create Request
-        # Note: If HC, model.save() will auto-set Book to 'On Hold'
         req = BookRequest.objects.create(
             member=member,
             full_name=f"{member.firstname} {member.surname}",
@@ -526,40 +524,34 @@ def submit_request(request):
             req.approval_status = 'Approved'
             req.save()
             
-            # Professional Message
-            sms_msg = f"FAYM Library: Request Approved.\nToken: {req.token}\nAccess your copy here: {book.location}"
-            email_body = f"Hello {member.firstname},\n\nYour request for '{book.title}' has been automatically approved.\n\nToken: {req.token}\nAccess Link: {book.location}\n\nHappy Reading!\nFAYM Library"
+            # Exact Wording Requested
+            sms_msg = f"Request Received. Token: {req.token}. Link: {book.location}"
+            email_body = f"Hello {member.firstname},\n\nRequest Received.\nToken: {req.token}\nLink: {book.location}\n\nFAYM Library"
             
             threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
             try:
-                send_mail(f"Access Granted: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
+                send_mail(f"Request Approved: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
             except: pass
             
         # === SCENARIO 2: HARD COPY (On Hold Logic) ===
         else:
-            # Check availability (Double check, though Request button handles UI)
-            # The model save() already set it "On Hold" if it was "Available".
-            # If it was already Taken/On Hold by race condition, we should handle that.
-            
             if book.availability == 'Taken': 
                  # Race condition caught
                  req.delete()
-                 messages.error(request, "Sorry, this book was just taken by someone else.")
-                 return redirect('index')
+                 return JsonResponse({'status': 'error', 'message': 'Sorry, this book was just taken by someone else.'})
 
-            # Professional Message
-            sms_msg = f"FAYM Library: Request Received.\nToken: {req.token}\nWe will contact you shortly regarding pickup."
-            email_body = f"Hello {member.firstname},\n\nWe have received your request for '{book.title}'.\nToken: {req.token}\n\nYour request is valid for 5 Hours. We will facilitate pickup shortly.\n\nFAYM Library"
+            # Exact Wording Requested
+            sms_msg = f"Request Received. Token: {req.token}. We will contact you shortly."
+            email_body = f"Hello {member.firstname},\n\nRequest Received.\nToken: {req.token}\n\nWe will contact you shortly regarding your request for '{book.title}'.\n\nFAYM Library"
             
             threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
             try:
-                send_mail(f"Request Pending: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
+                send_mail(f"Request Received: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
             except: pass
             
-        messages.success(request, f"Request Successful! Token: {req.token}")
-        return redirect('index')
+        return JsonResponse({'status': 'success', 'message': f'Request Successful! Token: {req.token}'})
         
-    return redirect('index')
+    return JsonResponse({'status': 'error', 'message': 'Invalid Method'})
 
 @staff_member_required
 def admin_dashboard_view(request):
