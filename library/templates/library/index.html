@@ -93,47 +93,25 @@
     
     async checkMember() {
         if (this.identity.length < 3) return;
-        let res = await fetch(`{% url 'check_member' %}?identity=${this.identity}`);
-        let data = await res.json();
-        this.isValidMember = data.valid;
-    },
-    
-    async sendOtp() {
-        this.isLoading = true;
-        let fd = new FormData();
-        fd.append('identity', this.identity);
-        fd.append('csrfmiddlewaretoken', this.csrf);
-        
-        let res = await fetch(`{% url 'send_otp' %}`, { method: 'POST', body: fd });
-        let data = await res.json();
-        this.isLoading = false;
-        
-        if (data.status === 'sent') {
-            this.showToast(data.message, 'success');
-            this.step = 2; // Move to OTP entry
-        } else {
-            this.showToast(data.message, 'error');
-        }
-    },
-    
-    async verifyOtp() {
-        this.isLoading = true;
-        let fd = new FormData();
-        fd.append('otp_code', this.otpCode);
-        fd.append('csrfmiddlewaretoken', this.csrf);
-        
-        let res = await fetch(`{% url 'verify_otp' %}`, { method: 'POST', body: fd });
-        let data = await res.json();
-        this.isLoading = false;
-        
-        if (data.status === 'success') {
-            this.showToast(data.message, 'success');
-            this.step = 3; // Ready to submit
-        } else {
-            this.showToast(data.message, 'error');
-        }
-    }
-}" @open-request-modal.window="open = true; bookId = $event.detail.id; bookTitle = $event.detail.title; reset();"
+        try {
+            let res = await fetch(`{% url 'check_member' %}?identity=${this.identity}`);
+            if (!res.ok) throw new Error('Server Error');
+            let data = await res.json();
+            this.isValidMember = data.valid;
+        } catch (e) {
+            console.error(e);
+            this.showToast(" Connection Error", 'error' ); } }, async sendOtp() { this.isLoading=true; let fd=new
+    FormData(); fd.append('identity', this.identity); fd.append('csrfmiddlewaretoken', this.csrf); try { let res=await
+    fetch(`{% url 'send_otp' %}`, { method: 'POST' , body: fd }); if (!res.ok) throw new Error('Server Error'); let
+    data=await res.json(); if (data.status==='sent' ) { this.showToast(data.message, 'success' ); this.step=2; } else {
+    this.showToast(data.message, 'error' ); } } catch (e) { console.error(e); this.showToast("Failed to connect to
+    server.", 'error' ); } finally { this.isLoading=false; } }, async verifyOtp() { this.isLoading=true; let fd=new
+    FormData(); fd.append('otp_code', this.otpCode); fd.append('csrfmiddlewaretoken', this.csrf); try { let res=await
+    fetch(`{% url 'verify_otp' %}`, { method: 'POST' , body: fd }); if (!res.ok) throw new Error('Server Error'); let
+    data=await res.json(); if (data.status==='success' ) { this.showToast(data.message, 'success' ); this.step=3; } else
+    { this.showToast(data.message, 'error' ); } } catch (e) { console.error(e); this.showToast("Failed to verify
+    code.", 'error' ); } finally { this.isLoading=false; } } }"
+    @open-request-modal.window="open = true; bookId = $event.detail.id; bookTitle = $event.detail.title; reset();"
     x-show="open" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition.opacity>
 
     <!-- Toast UI -->

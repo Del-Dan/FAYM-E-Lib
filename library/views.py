@@ -310,44 +310,19 @@ def bulk_import(request):
 
 # --- OTP Helper Functions ---
 def generate_wigal_otp(phone):
-    """Generate OTP using Wigal Frog v3."""
-    api_key = settings.WIGAL_API_KEY
-    username = settings.WIGAL_USERNAME
-    sender_id = settings.WIGAL_SENDER_ID
-    
-    url = 'https://frogapi.wigal.com.gh/api/v3/sms/otp/generate'
-    
-    # Format Phone
-    clean_phone = str(phone).strip()
-    clean_phone = ''.join(filter(str.isdigit, clean_phone))
-    if len(clean_phone) == 10 and clean_phone.startswith('0'):
-        clean_phone = '233' + clean_phone[1:]
-    elif len(clean_phone) == 9:
-        clean_phone = '233' + clean_phone
-        
-    payload = {
-        "senderid": sender_id,
-        "number": clean_phone,
-        "expiry": 5, # 5 minutes validity
-        "length": 6,
-        "type": "NUMERIC",
-        "messagetemplate": "Your FAYM Library OTP is %OTPCODE%. Valid for %EXPIRY% minutes."
-    }
-    
-    headers = {'Content-Type': 'application/json', 'API-KEY': api_key, 'USERNAME': username}
-    
+    """Generate OTP Locally and Send via SMS."""
     try:
-        response = requests.post(url, json=payload, headers=headers)
-        data = response.json()
-        print(f"OTP Generate Response: {data}")
-        return data.get('otpcode') if response.status_code == 200 else None
-        # Note: In real production, usually API sends the SMS. 
-        # But if the API returns the code (which some do for verification), we store it.
-        # Wigal Verify endpoint might handle the verification logic itself.
-        # Checking logic: The generated OTP is SENT to the user by Wigal. 
-        # We might not get the code back in response for security. 
-        # If Wigal handles verification, we use their verify endpoint.
-        # Let's assume we use Wigal's verify endpoint.
+        # Generate 6-digit code
+        import random
+        otp_code = str(random.randint(100000, 999999))
+        
+        # Construct Message
+        msg = f"Your FAYM Library OTP is {otp_code}. Valid for 5 minutes."
+        
+        # Send via existing SMS function
+        send_sms_wigal(phone, msg)
+        
+        return otp_code
     except Exception as e:
         print(f"OTP Gen Error: {e}")
         return None
