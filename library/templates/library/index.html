@@ -233,116 +233,115 @@
             },
 
             async checkMember() {
-            async checkMember() {
-                    if (this.identity.length < 3) return;
-                    try {
-                        let res = await fetch(`{% url 'check_member' %}?identity=${this.identity}&book_id=${this.bookId}`);
-                        if (!res.ok) throw new Error('Server Error');
-                        let data = await res.json();
+                if (this.identity.length < 3) return;
+                try {
+                    let res = await fetch(`{% url 'check_member' %}?identity=${this.identity}&book_id=${this.bookId}`);
+                    if (!res.ok) throw new Error('Server Error');
+                    let data = await res.json();
 
-                        if (data.status === 'valid') {
-                            this.isValidMember = true;
-                            this.showToast("Member Verified", "success");
-                        } else if (data.status === 'limit_reached') {
-                            this.isValidMember = false;
-                            this.showToast(data.message, "error");
-                        } else {
-                            this.isValidMember = false;
-                            // Don't toast for "not found" on every keystroke, just let UI handle it
-                        }
-                    } catch (e) {
-                        console.error(e);
+                    if (data.status === 'valid') {
+                        this.isValidMember = true;
+                        this.showToast("Member Verified", "success");
+                    } else if (data.status === 'limit_reached') {
+                        this.isValidMember = false;
+                        this.showToast(data.message, "error");
+                    } else {
+                        this.isValidMember = false;
+                        // Don't toast for "not found" on every keystroke, just let UI handle it
                     }
-                },
+                } catch (e) {
+                    console.error(e);
+                }
+            },
 
             async sendOtp() {
-                    this.isLoading = true;
-                    let fd = new FormData();
-                    fd.append('identity', this.identity);
-                    fd.append('csrfmiddlewaretoken', this.csrf);
+                this.isLoading = true;
+                let fd = new FormData();
+                fd.append('identity', this.identity);
+                fd.append('csrfmiddlewaretoken', this.csrf);
 
-                    try {
-                        let res = await fetch(`{% url 'send_otp' %}`, { method: 'POST', body: fd });
-                        let data = await res.json();
-                        if (data.status === 'sent') {
-                            this.showToast(data.message, 'success');
-                            this.step = 2;
-                        }
-                        else if (data.status === 'already_verified') {
-                            this.showToast("Session Active. Skipping OTP.", 'success');
-                            this.step = 3;
-                        }
-                        else {
-                            this.showToast(data.message, 'error');
-                        }
-                    } catch (e) {
-                        this.showToast("Connection failed.", 'error');
-                    } finally {
-                        this.isLoading = false;
+                try {
+                    let res = await fetch(`{% url 'send_otp' %}`, { method: 'POST', body: fd });
+                    let data = await res.json();
+                    if (data.status === 'sent') {
+                        this.showToast(data.message, 'success');
+                        this.step = 2;
                     }
-                },
+                    else if (data.status === 'already_verified') {
+                        this.showToast("Session Active. Skipping OTP.", 'success');
+                        this.step = 3;
+                    }
+                    else {
+                        this.showToast(data.message, 'error');
+                    }
+                } catch (e) {
+                    this.showToast("Connection failed.", 'error');
+                } finally {
+                    this.isLoading = false;
+                }
+            },
 
             async verifyOtp() {
-                    this.isLoading = true;
-                    let fd = new FormData();
-                    fd.append('otp_code', this.otpCode);
-                    fd.append('csrfmiddlewaretoken', this.csrf);
+                this.isLoading = true;
+                let fd = new FormData();
+                fd.append('otp_code', this.otpCode);
+                fd.append('csrfmiddlewaretoken', this.csrf);
 
-                    try {
-                        let res = await fetch(`{% url 'verify_otp' %}`, { method: 'POST', body: fd });
-                        let data = await res.json();
-                        if (data.status === 'success') {
-                            this.showToast("Verified Successfully", 'success');
-                            this.step = 3;
-                        } else {
-                            this.showToast(data.message, 'error');
-                        }
-                    } catch (e) {
-                        this.showToast("Verification failed.", 'error');
-                    } finally {
-                        this.isLoading = false;
+                try {
+                    let res = await fetch(`{% url 'verify_otp' %}`, { method: 'POST', body: fd });
+                    let data = await res.json();
+                    if (data.status === 'success') {
+                        this.showToast("Verified Successfully", 'success');
+                        this.step = 3;
+                    } else {
+                        this.showToast(data.message, 'error');
                     }
-                },
+                } catch (e) {
+                    this.showToast("Verification failed.", 'error');
+                } finally {
+                    this.isLoading = false;
+                }
+            },
 
             async submitFinalRequest() {
-                    this.isLoading = true;
-                    let fd = new FormData();
-                    fd.append('book_id', this.bookId);
-                    fd.append('identity', this.identity);
-                    fd.append('csrfmiddlewaretoken', this.csrf);
+                this.isLoading = true;
+                let fd = new FormData();
+                fd.append('book_id', this.bookId);
+                fd.append('identity', this.identity);
+                fd.append('csrfmiddlewaretoken', this.csrf);
 
-                    try {
-                        let res = await fetch(`{% url 'submit_request' %}`, { method: 'POST', body: fd });
-                        let data = await res.json();
+                try {
+                    let res = await fetch(`{% url 'submit_request' %}`, { method: 'POST', body: fd });
+                    let data = await res.json();
 
-                        if (data.status === 'success') {
-                            // 1. Show Success Message
-                            this.showToast(data.message, 'success');
+                    if (data.status === 'success') {
+                        // 1. Show Success Message
+                        this.showToast(data.message, 'success');
 
-                            // 2. LIVE UI UPDATE: Update button to 'Unavailable' without reload
-                            const btn = document.getElementById(`btn-${this.bookId}`);
-                            if (btn) {
-                                btn.innerHTML = `<span class="flex items-center justify-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Pending Hold</span>`;
-                                btn.disabled = true;
-                                btn.className = "w-full py-2.5 bg-slate-50 text-slate-400 text-xs font-bold rounded-lg cursor-not-allowed border border-slate-100 transition-all";
-                            }
-
-                            // 3. Close Modal Immediately
-                            this.open = false;
-
-                            // 4. Reset Form
-                            setTimeout(() => this.reset(), 500);
-
-                        } else {
-                            this.showToast(data.message, 'error');
+                        // 2. LIVE UI UPDATE: Update button to 'Unavailable' without reload
+                        const btn = document.getElementById(`btn-${this.bookId}`);
+                        if (btn) {
+                            btn.innerHTML = `<span class="flex items-center justify-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Pending Hold</span>`;
+                            btn.disabled = true;
+                            btn.className = "w-full py-2.5 bg-slate-50 text-slate-400 text-xs font-bold rounded-lg cursor-not-allowed border border-slate-100 transition-all";
                         }
-                    } catch (e) {
-                        this.showToast("Request failed. Try again.", 'error');
-                    } finally {
-                        this.isLoading = false;
+
+                        // 3. Close Modal Immediately
+                        this.open = false;
+
+                        // 4. Reset Form
+                        setTimeout(() => this.reset(), 500);
+
+                    } else {
+                        this.showToast(data.message, 'error');
                     }
+                } catch (e) {
+                    this.showToast("Request failed. Try again.", 'error');
+                } finally {
+                    this.isLoading = false;
                 }
-            }));
+            }
+        }));
     });
 </script>
 {% endblock %}
