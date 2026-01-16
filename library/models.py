@@ -117,7 +117,7 @@ class BookRequest(models.Model):
     full_name = models.CharField(max_length=200)
     email = models.EmailField()
     
-    book = models.ForeignKey(Book, on_delete=models.CASCADE)
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, null=True)
     request_status = models.CharField(max_length=20, choices=REQUEST_STATUS_CHOICES, default='Valid')
     approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS_CHOICES, default='Pending')
     approval_date = models.DateTimeField(null=True, blank=True)
