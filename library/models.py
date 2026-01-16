@@ -15,6 +15,9 @@ class Member(models.Model):
     mobile_number = models.CharField(max_length=20, unique=True)
     residence = models.CharField(max_length=200, blank=True, null=True)
     landmark = models.CharField(max_length=200, blank=True, null=True)
+    
+    # Link to Admin/Staff User (Optional)
+    user = models.OneToOneField('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='member', help_text="Link this member to a Staff User for SMS/Login")
 
     def __str__(self):
         return f"{self.firstname} {self.surname}"
