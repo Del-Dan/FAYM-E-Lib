@@ -60,6 +60,15 @@
                 <input type="hidden" name="action" value="confirm_return">
                 <input type="hidden" name="token" value="{{ search_result.token }}">
 
+                <!-- Notes Field -->
+                <div class="mb-4">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Book Condition
+                        / Notes</label>
+                    <textarea name="notes" rows="2"
+                        class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:border-emerald-500 outline-none text-sm"
+                        placeholder="e.g. Good condition, returned on time..."></textarea>
+                </div>
+
                 <label class="flex items-center gap-4 cursor-pointer group">
                     <div class="relative flex items-center">
                         <input type="checkbox" required

@@ -202,6 +202,10 @@ class ReturnLog(models.Model):
     book_title_snapshot = models.CharField(max_length=200, blank=True)
     request_date_snapshot = models.DateTimeField(null=True)
     
+    # New Fields for UAT
+    validator = models.CharField(max_length=100, blank=True, null=True, help_text="Staff/Member who validated this")
+    notes = models.TextField(blank=True, null=True, help_text="Condition of book or other remarks")
+    
     def save(self, *args, **kwargs):
         # Auto-populate snapshots from token if possible
         if not self.book_title_snapshot:

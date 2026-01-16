@@ -121,7 +121,7 @@
                     <div class="flex justify-between items-center mt-3 h-6">
                         <p x-show="identity.length > 3" class="text-xs font-semibold transition-colors"
                             :class="isValidMember ? 'text-statusgreen' : 'text-slate-400'"
-                            x-text="isValidMember ? '✓ Member Found' : 'Searching directory...'">
+                            x-text="isValidMember ? '✓ Member Found' : (identity.length > 3 ? 'Checking / Not Found' : '')">
                         </p>
                     </div>
 
@@ -257,10 +257,10 @@
                     if (data.status === 'sent') {
                         this.showToast(data.message, 'success');
                         this.step = 2;
-                    } 
+                    }
                     else if (data.status === 'already_verified') {
-                         this.showToast("Session Active. Skipping OTP.", 'success');
-                         this.step = 3;
+                        this.showToast("Session Active. Skipping OTP.", 'success');
+                        this.step = 3;
                     }
                     else {
                         this.showToast(data.message, 'error');
