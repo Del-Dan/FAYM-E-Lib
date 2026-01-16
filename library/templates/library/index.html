@@ -257,7 +257,12 @@
                     if (data.status === 'sent') {
                         this.showToast(data.message, 'success');
                         this.step = 2;
-                    } else {
+                    } 
+                    else if (data.status === 'already_verified') {
+                         this.showToast("Session Active. Skipping OTP.", 'success');
+                         this.step = 3;
+                    }
+                    else {
                         this.showToast(data.message, 'error');
                     }
                 } catch (e) {
