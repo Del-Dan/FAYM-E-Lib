@@ -456,18 +456,7 @@ def submit_request(request):
             body = f"Hello {req.full_name},\n\nYour request for '{req.book.title}' is confirmed.\nToken: {req.token}\n\nPlease wait for approval SMS before going to pickup.\n\nFAYM Library"
             threading.Thread(target=send_email_background, args=(subject, body, [req.email])).start()
             
-        else: # HC
-            if book.availability == 'Taken': 
-                 req.delete()
-                 return JsonResponse({'status': 'error', 'message': 'Book just taken.'})
 
-            # FIX: Added Token and Newlines
-            sms_msg = f"Dear {member.firstname},\nRequest for '{book.title[:20]}...' received.\nToken: {req.token}\nYou would be contacted shortly on your request."
-            email_body = f"Dear {member.firstname},\n\nWe have received your request for '{book.title}'.\n\nRequest Token: {req.token}\n\nYou would be contacted shortly on your request.\n\nRegards,\nFAYM Library Team"
-            
-            threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
-            threading.Thread(target=send_email_background, args=(f"Request Pending: {book.title}", email_body, [member.email])).start()
-            
         return JsonResponse({'status': 'success', 'message': f'Request Successful! Token: {req.token}'})
     return JsonResponse({'status': 'error', 'message': 'Invalid Method'})
 
