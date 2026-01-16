@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Member, Book, BookRequest, ValidateReturns
+from .models import Member, Book, BookRequest, ReturnLog
 
 @admin.register(Member)
 class MemberAdmin(admin.ModelAdmin):
@@ -15,11 +15,12 @@ class BookAdmin(admin.ModelAdmin):
 @admin.register(BookRequest)
 class BookRequestAdmin(admin.ModelAdmin):
     list_display = ('token', 'member_link', 'book', 'request_status', 'approval_status', 'timestamp')
-    list_filter = ('approval_status', 'return_status', 'request_status')
+    list_filter = ('approval_status', 'request_status') # Removed return_status from filter to reduce noise
     search_fields = ('token', 'email', 'full_name', 'member__firstname', 'member__surname')
     
-    # Read-only fields that should NEVER be edited manually
+    # Read-only fields (Exclude return_status entirely from edit form)
     readonly_fields = ('token', 'timestamp', 'days_left', 'full_name', 'email', 'member', 'book', 'approval_date', 'expected_return_date')
+    exclude = ('return_status',) # System field only
     
     # Enable Autocomplete for initial selection (though they become read-only later)
     autocomplete_fields = ['member', 'book']
@@ -42,7 +43,7 @@ class BookRequestAdmin(admin.ModelAdmin):
         # If creating new, allow selection of Member/Book
         return ('token', 'timestamp', 'days_left', 'full_name', 'email', 'approval_date', 'expected_return_date')
 
-@admin.register(ValidateReturns)
-class ValidateReturnsAdmin(admin.ModelAdmin):
+@admin.register(ReturnLog)
+class ReturnLogAdmin(admin.ModelAdmin):
     list_display = ('timestamp', 'action', 'book_title_snapshot', 'bib_lit_member')
     list_filter = ('action',)

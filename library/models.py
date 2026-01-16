@@ -186,7 +186,7 @@ class BookRequest(models.Model):
     def __str__(self):
         return f"{self.token} - {self.book.title if self.book else 'Unknown'}"
 
-class ValidateReturns(models.Model):
+class ReturnLog(models.Model):
     ACTION_CHOICES = [
         ('Approval', 'Approval'),
         ('Return', 'Return'),
@@ -222,6 +222,10 @@ class ValidateReturns(models.Model):
              return delta.days
         # For returns, need logic: Timestamp - Date of Action? 
         return 0
+
+    class Meta:
+        verbose_name = "Return History Log"
+        verbose_name_plural = "Return History Logs"
 
 class OTPRecord(models.Model):
     phone_number = models.CharField(max_length=20)

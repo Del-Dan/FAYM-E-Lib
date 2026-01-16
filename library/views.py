@@ -45,7 +45,12 @@ def index(request):
     if request.headers.get('HX-Request'):
         return render(request, 'library/partials/book_list.html', {'books': page_obj})
 
-    return render(request, 'library/index.html', {'books': page_obj, 'categories': categories})
+    context = {
+        'books': page_obj, 
+        'categories': categories,
+        'verified_identity': request.session.get('verified_identity', '') 
+    }
+    return render(request, 'library/index.html', context)
 
 def send_sms_wigal(phone, message):
     """Send SMS using Wigal Frog v3 API."""
@@ -374,6 +379,16 @@ def send_otp(request):
         
     if not member:
         return JsonResponse({'status': 'error', 'message': 'Member email not found in directory.'})
+        
+    # --- CHECK EXISTING SESSION ---
+    # If session is verified AND matches the requested member (via phone check), skip OTP
+    if request.session.get('is_verified') and request.session.get('verified_identity') == member.mobile_number:
+         # Check expiry
+         expiry_str = request.session.get('session_expiry')
+         if expiry_str:
+             if timezone.now() < datetime.datetime.fromisoformat(expiry_str):
+                 return JsonResponse({'status': 'already_verified', 'message': 'Active Session Found.'})
+    # ------------------------------
     
     # Generate Code via Wigal
     otp_code = generate_wigal_otp(member.mobile_number)
@@ -429,18 +444,17 @@ def verify_otp_action(request):
 
 def check_request_limits(member, book_type):
     """
-    Enforce limits:
+    Enforce limits using Member ID for accuracy:
     - SC: Max 2 per week, Max 4 per month.
     - HC: Max 1 active request until returned.
     """
     now = timezone.now()
-    email = member.email
     
     if book_type == 'SC':
         # Check Weekly (Last 7 days)
         week_ago = now - timedelta(days=7)
         week_count = BookRequest.objects.filter(
-            email=email, 
+            member=member, 
             book__type='SC', 
             timestamp__gte=week_ago
         ).count()
@@ -451,7 +465,7 @@ def check_request_limits(member, book_type):
         # Check Monthly (Last 30 days)
         month_ago = now - timedelta(days=30)
         month_count = BookRequest.objects.filter(
-            email=email, 
+            member=member, 
             book__type='SC', 
             timestamp__gte=month_ago
         ).count()
@@ -461,9 +475,8 @@ def check_request_limits(member, book_type):
             
     elif book_type == 'HC':
         # Check Active HC requests (Not Returned)
-        # Assuming 'Returned' or 'N/A' means closed.
         active_hc = BookRequest.objects.filter(
-            email=email,
+            member=member,
             book__type='HC'
         ).exclude(return_status='Returned').exists()
         
@@ -471,6 +484,13 @@ def check_request_limits(member, book_type):
             return "Limit Reached: You have an unreturned Hard Copy book. Please return it first."
             
     return None
+
+def send_email_background(subject, body, recipient_list):
+    try:
+        from_email = settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com'
+        send_mail(subject, body, from_email, recipient_list)
+    except Exception as e:
+        print(f"Background Email Failed: {e}")
 
 def submit_request(request):
     """
@@ -528,10 +548,9 @@ def submit_request(request):
             sms_msg = f"Dear {member.firstname}, Your request for '{book.title[:20]}...' is Approved. Link: {book.location}. Token: {req.token}"
             email_body = f"Dear {member.firstname},\n\nYour request for '{book.title}' has been approved.\n\nAccess Link: {book.location}\nRequest Token: {req.token}\n\nHappy Reading,\nFAYM Library Team"
             
+            # Threading BOTH SMS and Email
             threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
-            try:
-                send_mail(f"Access Granted: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
-            except: pass
+            threading.Thread(target=send_email_background, args=(f"Access Granted: {book.title}", email_body, [member.email])).start()
             
         # === SCENARIO 2: HARD COPY (On Hold Logic) ===
         else:
@@ -540,14 +559,13 @@ def submit_request(request):
                  req.delete()
                  return JsonResponse({'status': 'error', 'message': 'Sorry, this book was just taken by someone else.'})
 
-            # Professional Choice
-            sms_msg = f"Dear {member.firstname}, Request for '{book.title[:20]}...' received. Token: {req.token}. Please pickup at the desk."
-            email_body = f"Dear {member.firstname},\n\nWe have received your request for '{book.title}'.\n\nRequest Token: {req.token}\n\nPlease proceed to the library desk to pick up your copy.\n\nRegards,\nFAYM Library Team"
+            # Updated Professional Message
+            sms_msg = f"Dear {member.firstname}, Request for '{book.title[:20]}...' received. You would be contacted shortly on your request."
+            email_body = f"Dear {member.firstname},\n\nWe have received your request for '{book.title}'.\n\nRequest Token: {req.token}\n\nYou would be contacted shortly on your request.\n\nRegards,\nFAYM Library Team"
             
+            # Threading BOTH SMS and Email
             threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
-            try:
-                send_mail(f"Request Pending: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
-            except: pass
+            threading.Thread(target=send_email_background, args=(f"Request Pending: {book.title}", email_body, [member.email])).start()
             
         return JsonResponse({'status': 'success', 'message': f'Request Successful! Token: {req.token}'})
         
