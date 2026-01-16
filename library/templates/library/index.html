@@ -206,6 +206,15 @@
     document.addEventListener('alpine:init', () => {
         Alpine.data('requestModal', () => ({
             open: false,
+            init() {
+                this.$watch('open', value => {
+                    if (value) {
+                        document.body.classList.add('overflow-hidden');
+                    } else {
+                        document.body.classList.remove('overflow-hidden');
+                    }
+                })
+            },
             step: 1,
             bookId: '',
             bookTitle: '',
