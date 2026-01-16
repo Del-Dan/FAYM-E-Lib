@@ -18,7 +18,7 @@ class BookRequestAdmin(admin.ModelAdmin):
     list_filter = ('approval_status', 'return_status', 'request_status')
     search_fields = ('token', 'email', 'full_name', 'member__firstname', 'member__surname')
     
-    # Read-only fields that should NEVER be edited manually to preserve audit trail
+    # Read-only fields that should NEVER be edited manually
     readonly_fields = ('token', 'timestamp', 'days_left', 'full_name', 'email', 'member', 'book', 'approval_date', 'expected_return_date')
     
     # Enable Autocomplete for initial selection (though they become read-only later)
