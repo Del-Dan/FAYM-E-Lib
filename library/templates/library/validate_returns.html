@@ -1,71 +1,126 @@
 {% extends 'library/base.html' %}
 
 {% block content %}
-<div class="max-w-xl mx-auto mt-12 bg-white rounded-2xl shadow-premium p-10 border border-slate-100">
-
-    <div class="text-center mb-8">
-        <h1 class="text-2xl font-bold text-slate-800">Validate Returns</h1>
-        <p class="text-slate-500">Enter the Request Token to process a returned book.</p>
+<div class="max-w-4xl mx-auto py-12 px-6">
+    <!-- Header -->
+    <div class="text-center mb-10">
+        <h1 class="text-3xl font-bold text-slate-900">Validate Returns</h1>
+        <p class="text-slate-500 mt-2">Process returned Hard Copy books.</p>
     </div>
 
-    <!-- Step 1: Search -->
-    <form method="POST" class="space-y-4 mb-8">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="search">
-        <div class="flex gap-2">
-            <input type="text" name="token" placeholder="Enter Token (e.g. uuid...)"
-                class="flex-1 px-4 py-3 border border-slate-200 rounded-xl focus:border-primary outline-none" required>
-            <button type="submit"
-                class="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors">
-                Search
-            </button>
-        </div>
-    </form>
-
-    <hr class="border-slate-100 my-8">
-
-    <!-- Step 2: Result & Confirm -->
-    {% if search_result %}
-    <div class="bg-slate-50 rounded-xl p-6 border border-slate-100">
-        <h3 class="text-lg font-bold text-slate-800 mb-4">Request Details</h3>
-
-        <div class="space-y-3 text-sm">
-            <div class="flex justify-between">
-                <span class="text-slate-500">Book:</span>
-                <span class="font-medium text-slate-900">{{ search_result.book.title }}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-slate-500">Member:</span>
-                <span class="font-medium text-slate-900">{{ search_result.full_name }}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-slate-500">Expected Return:</span>
-                <span class="font-medium text-slate-900">{{ search_result.expected_return_date|date:"M d, Y" }}</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-slate-500">Status:</span>
-                <span
-                    class="font-bold {% if search_result.return_status == 'Overdue' %}text-red-500{% else %}text-amber-500{% endif %}">
-                    {{ search_result.return_status }}
-                </span>
-            </div>
-        </div>
-
-        <form method="POST" class="mt-8">
+    <!-- Search Form -->
+    <div class="bg-white p-6 rounded-2xl shadow-premium border border-slate-100 mb-8 max-w-2xl mx-auto">
+        <form method="POST" class="flex gap-4">
             {% csrf_token %}
-            <input type="hidden" name="action" value="confirm_return">
-            <input type="hidden" name="token" value="{{ search_result.token }}">
-
+            <input type="hidden" name="action" value="search">
+            <input type="text" name="token"
+                class="flex-1 px-4 py-3 border border-slate-200 rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none font-mono tracking-wider text-slate-800"
+                placeholder="Enter or Scan Token..." required autofocus>
             <button type="submit"
-                class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-                Confirm Return
+                class="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-primary transition-colors shadow-lg">
+                Search
             </button>
         </form>
     </div>
+
+    <!-- Search Result / Action Card -->
+    {% if search_result %}
+    <div
+        class="bg-white rounded-2xl shadow-premium border border-slate-100 overflow-hidden transform transition-all animate-fade-in-up mb-12 max-w-2xl mx-auto">
+        <div class="p-8">
+            <div class="flex items-start justify-between mb-6">
+                <div>
+                    <span
+                        class="inline-block px-3 py-1 bg-amber-50 text-amber-600 text-xs font-bold uppercase tracking-wider rounded-lg mb-2">Hard
+                        Copy</span>
+                    <h2 class="text-2xl font-bold text-slate-900">{{ search_result.book.title }}</h2>
+                    <p class="text-slate-500 font-medium">{{ search_result.book.author }}</p>
+                </div>
+                <div class="bg-slate-50 px-4 py-2 rounded-lg text-right">
+                    <p class="text-xs text-slate-400 uppercase tracking-wider font-bold">Member</p>
+                    <p class="font-bold text-slate-800">{{ search_result.full_name }}</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div>
+                    <p class="text-xs text-slate-400 uppercase tracking-wider font-bold">Approved On</p>
+                    <p class="font-mono text-slate-700 font-medium">{{ search_result.approval_date|date:"M j, Y" }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 uppercase tracking-wider font-bold">Due Date</p>
+                    <p class="font-mono text-amber-600 font-bold">{{ search_result.expected_return_date|date:"M j, Y" }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Action Area -->
+            <form method="POST" class="bg-emerald-50/50 p-6 rounded-xl border border-emerald-100/50">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="confirm_return">
+                <input type="hidden" name="token" value="{{ search_result.token }}">
+
+                <label class="flex items-center gap-4 cursor-pointer group">
+                    <div class="relative flex items-center">
+                        <input type="checkbox" required
+                            class="peer h-6 w-6 cursor-pointer appearance-none rounded-md border-2 border-slate-300 transition-all checked:border-emerald-500 checked:bg-emerald-500 hover:border-emerald-400">
+                        <svg class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 transition-opacity peer-checked:opacity-100"
+                            xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                    </div>
+                    <span class="text-slate-700 font-bold group-hover:text-emerald-700 transition-colors">
+                        Confirm Return (Checkbox)
+                    </span>
+                </label>
+
+                <button type="submit"
+                    class="mt-4 w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all">
+                    Process Return
+                </button>
+            </form>
+        </div>
+    </div>
     {% endif %}
+
+    <!-- Active Loans Table -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="p-6 border-b border-slate-100 bg-slate-50/50">
+            <h3 class="text-lg font-bold text-slate-800">Pending Returns (Active HC Loans)</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-slate-50 text-xs uppercase text-slate-500 font-semibold">
+                    <tr>
+                        <th class="px-6 py-4">Title</th>
+                        <th class="px-6 py-4">Member</th>
+                        <th class="px-6 py-4">Token</th>
+                        <th class="px-6 py-4 text-right">Due Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for req in pending_returns %}
+                    <tr class="hover:bg-slate-50 transition-colors group cursor-pointer"
+                        title="Double click to copy token">
+                        <td class="px-6 py-4 text-sm font-medium text-slate-700">{{ req.book.title }}</td>
+                        <td class="px-6 py-4 text-sm text-slate-600">{{ req.full_name }}</td>
+                        <td
+                            class="px-6 py-4 text-sm font-mono text-slate-500 group-hover:text-primary transition-colors select-all">
+                            {{ req.token }}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-right font-bold text-slate-800">{{
+                            req.expected_return_date|date:"M j" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-8 text-center text-slate-400 text-sm">No active loans found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
 </div>
 {% endblock %}

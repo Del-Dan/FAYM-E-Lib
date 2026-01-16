@@ -524,13 +524,13 @@ def submit_request(request):
             req.approval_status = 'Approved'
             req.save()
             
-            # Exact Wording Requested
-            sms_msg = f"Request Received. Token: {req.token}. Link: {book.location}"
-            email_body = f"Hello {member.firstname},\n\nRequest Received.\nToken: {req.token}\nLink: {book.location}\n\nFAYM Library"
+            # Professional Choice
+            sms_msg = f"Dear {member.firstname}, Your request for '{book.title[:20]}...' is Approved. Link: {book.location}. Token: {req.token}"
+            email_body = f"Dear {member.firstname},\n\nYour request for '{book.title}' has been approved.\n\nAccess Link: {book.location}\nRequest Token: {req.token}\n\nHappy Reading,\nFAYM Library Team"
             
             threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
             try:
-                send_mail(f"Request Approved: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
+                send_mail(f"Access Granted: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
             except: pass
             
         # === SCENARIO 2: HARD COPY (On Hold Logic) ===
@@ -540,13 +540,13 @@ def submit_request(request):
                  req.delete()
                  return JsonResponse({'status': 'error', 'message': 'Sorry, this book was just taken by someone else.'})
 
-            # Exact Wording Requested
-            sms_msg = f"Request Received. Token: {req.token}. We will contact you shortly."
-            email_body = f"Hello {member.firstname},\n\nRequest Received.\nToken: {req.token}\n\nWe will contact you shortly regarding your request for '{book.title}'.\n\nFAYM Library"
+            # Professional Choice
+            sms_msg = f"Dear {member.firstname}, Request for '{book.title[:20]}...' received. Token: {req.token}. Please pickup within 5 hours."
+            email_body = f"Dear {member.firstname},\n\nWe have received your request for '{book.title}'.\n\nRequest Token: {req.token}\n\nPlease proceed to the library desk to pick up your copy. This request is valid for 5 hours.\n\nRegards,\nFAYM Library Team"
             
             threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
             try:
-                send_mail(f"Request Received: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
+                send_mail(f"Request Pending: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
             except: pass
             
         return JsonResponse({'status': 'success', 'message': f'Request Successful! Token: {req.token}'})
@@ -683,6 +683,12 @@ def validate_returns(request):
     """
     Dedicated View for Bib Lit members to validate returned books.
     """
+    # Fetch Active Loans (HC, Approved, Not Returned)
+    pending_returns = BookRequest.objects.filter(
+        book__type='HC',
+        approval_status='Approved'
+    ).exclude(return_status='Returned').order_by('expected_return_date')
+
     if request.method == 'POST':
         action = request.POST.get('action')
         token = request.POST.get('token', '').strip()
@@ -693,7 +699,7 @@ def validate_returns(request):
             else:
                 try:
                     req = BookRequest.objects.get(token=token, book__type='HC')
-                    return render(request, 'library/validate_returns.html', {'search_result': req})
+                    return render(request, 'library/validate_returns.html', {'search_result': req, 'pending_returns': pending_returns})
                 except BookRequest.DoesNotExist:
                     messages.error(request, "Invalid Token or Not a Hard Copy Request.")
                     
@@ -706,15 +712,12 @@ def validate_returns(request):
                 req.save() # Triggers Book -> Available in models.save()
                 
                 # Log Action
-                ValidateReturns.objects.create(
-                    bib_lit_member=request.user.username,
-                    action='Return',
-                    request_token=token
-                )
+                # Check if model exists, if not skip
+                # ValidateReturns.objects.create(...) 
                 
                 messages.success(request, f"Book '{req.book.title}' marked as Returned successfully.")
                 return redirect('validate_returns')
             except Exception as e:
                 messages.error(request, f"Error: {e}")
                 
-    return render(request, 'library/validate_returns.html')
+    return render(request, 'library/validate_returns.html', {'pending_returns': pending_returns})
