@@ -125,6 +125,10 @@ class BookRequest(models.Model):
     approval_status = models.CharField(max_length=20, choices=APPROVAL_STATUS_CHOICES, default='Pending')
     approval_date = models.DateTimeField(null=True, blank=True)
     
+    # Staff Tracking
+    assigned_to = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_requests', help_text="Librarian responsible for this request")
+    approved_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_requests', help_text="Staff who approved this")
+
     # HC Specifics
     delivery_date = models.DateTimeField(null=True, blank=True)
     expected_return_date = models.DateTimeField(null=True, blank=True)

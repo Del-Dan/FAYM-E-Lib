@@ -2,9 +2,35 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q
 from .models import Book, Member, BookRequest, OTPRecord, ReturnLog
+from django.contrib.auth.models import User, Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+
+# --- SETUP VIEW (NO SCRIPT) ---
+@staff_member_required
+def setup_permissions(request):
+    if not request.user.is_superuser:
+        return HttpResponse("Unauthorized", status=403)
+        
+    # Create Librarians Group
+    group, created = Group.objects.get_or_create(name='Librarians')
+    
+    # Assign Permissions
+    models_to_grant = [BookRequest, ReturnLog, Book, Member]
+    perms = []
+    for model in models_to_grant:
+        ct = ContentType.objects.get_for_model(model)
+        # Grant view, change, add
+        p_list = Permission.objects.filter(content_type=ct)
+        perms.extend(p_list)
+        
+    group.permissions.set(perms)
+    group.save()
+    
+    return HttpResponse(f"Setup Complete. Group 'Librarians' created/updated with {len(perms)} permissions. You can now assign staff to this group in Admin.")
+
 from django.core.management import call_command
 import io
 import csv
@@ -402,6 +428,33 @@ def submit_request(request):
             email_body = f"Dear {member.firstname},\n\nYour request for '{book.title}' has been approved.\n\nAccess Link: {book.location}\nRequest Token: {req.token}\n\nHappy Reading,\nFAYM Library Team"
             threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
             threading.Thread(target=send_email_background, args=(f"Access Granted: {book.title}", email_body, [member.email])).start()
+        
+        else:
+            # HC Logic: Round Robin Assignment
+            librarians = User.objects.filter(groups__name='Librarians').order_by('id')
+            if librarians.exists():
+                count = BookRequest.objects.filter(book__type='HC').count()
+                assignee = librarians[count % librarians.count()]
+                req.assigned_to = assignee
+                req.save()
+                
+                # SMS to Librarian (Best Effort)
+                try:
+                     phone = getattr(assignee.member, 'mobile_number', None)
+                     if phone:
+                         msg = f"New HC Request: {req.book.title}. Please Approve."
+                         threading.Thread(target=send_sms_wigal, args=(phone, msg)).start()
+                except:
+                    pass
+
+            # SMS to User
+            msg = f"Request Confirmed. Pickup Token: {req.token}. View status online."
+            threading.Thread(target=send_sms_wigal, args=(member.mobile_number, msg)).start()
+            
+            # Email to User
+            subject = f"Book Request Confirmed: {req.book.title}"
+            body = f"Hello {req.full_name},\n\nYour request for '{req.book.title}' is confirmed.\nToken: {req.token}\n\nPlease wait for approval SMS before going to pickup.\n\nFAYM Library"
+            threading.Thread(target=send_email_background, args=(subject, body, [req.email])).start()
             
         else: # HC
             if book.availability == 'Taken': 
