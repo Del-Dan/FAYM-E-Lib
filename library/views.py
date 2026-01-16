@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
 from django.db.models import Q
-from .models import Book, Member, BookRequest, OTPRecord
+from .models import Book, Member, BookRequest, OTPRecord, ReturnLog
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
