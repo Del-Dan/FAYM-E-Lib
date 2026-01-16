@@ -4,50 +4,118 @@
 {% block extrahead %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<style>
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="bg-gray-50 min-h-screen p-8">
-    <h1 class="text-4xl font-extrabold text-gray-900 mb-8">📊 Library Analytics Dashboard</h1>
+<div class="bg-slate-50 min-h-screen p-6 md:p-10 font-sans">
 
-    <!-- KPI Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
-            <h3 class="text-gray-500 text-sm font-uppercase font-bold">Total Requests</h3>
-            <p class="text-3xl font-bold text-gray-800">{{ total_requests }}</p>
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-10">
+        <div>
+            <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">Analytics Overview</h1>
+            <p class="text-slate-500 mt-1">Real-time insights into library performance.</p>
         </div>
-        <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-green-500">
-            <h3 class="text-gray-500 text-sm font-uppercase font-bold">Approved</h3>
-            <p class="text-3xl font-bold text-gray-800">{{ approved_count }}</p>
-        </div>
-        <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-yellow-500">
-            <h3 class="text-gray-500 text-sm font-uppercase font-bold">Pending</h3>
-            <p class="text-3xl font-bold text-gray-800">{{ pending_count }}</p>
-        </div>
-        <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-purple-500">
-            <h3 class="text-gray-500 text-sm font-uppercase font-bold">Active Members</h3>
-            <p class="text-3xl font-bold text-gray-800">{{ active_members }}</p>
-        </div>
-
-        <!-- Lead Time -->
-        <div class="bg-white p-6 rounded-xl shadow-lg border-l-4 border-orange-500 md:col-span-4 lg:col-span-1">
-            <h3 class="text-gray-500 text-sm font-uppercase font-bold">Avg. Lead Time</h3>
-            <p class="text-3xl font-bold text-gray-800">{{ lead_time }}</p>
-            <p class="text-xs text-slate-400">Request to Approval</p>
+        <div class="bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200 text-sm font-medium text-slate-600">
+            Current Session: <span class="text-green-600">Active</span>
         </div>
     </div>
 
-    <!-- Charts Row 1 -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <!-- Requests Over Time -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="text-xl font-bold mb-4 text-gray-800">Requests (Last 30 Days)</h3>
-            <canvas id="timeChart"></canvas>
+    <!-- KPI Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+        <!-- Card 1 -->
+        <div
+            class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Requests</span>
+            </div>
+            <p class="text-4xl font-black text-slate-800">{{ total_requests }}</p>
         </div>
-        <!-- Status Distribution -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="text-xl font-bold mb-4 text-gray-800">Request Status</h3>
-            <div class="h-64 flex justify-center">
+
+        <!-- Card 2 -->
+        <div
+            class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Approved</span>
+            </div>
+            <p class="text-4xl font-black text-slate-800">{{ approved_count }}</p>
+        </div>
+
+        <!-- Card 3 -->
+        <div
+            class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Pending</span>
+            </div>
+            <p class="text-4xl font-black text-slate-800">{{ pending_count }}</p>
+        </div>
+
+        <!-- Card 4 (Lead Time) -->
+        <div
+            class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Avg. Lead Time</span>
+            </div>
+            <p class="text-4xl font-black text-slate-800">{{ lead_time }}</p>
+            <p class="text-xs text-slate-400 mt-1">Request to Approval</p>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+        <!-- Line Chart (Span 2) -->
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                </svg>
+                Activity Trend (30 Days)
+            </h3>
+            <div class="chart-container">
+                <canvas id="timeChart"></canvas>
+            </div>
+        </div>
+        <!-- Donut Chart (Span 1) -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                </svg>
+                Status Distribution
+            </h3>
+            <div class="chart-container flex justify-center items-center">
                 <canvas id="pieChart"></canvas>
             </div>
         </div>
@@ -56,53 +124,64 @@
     <!-- Tables Row -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- Top Books -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="text-xl font-bold mb-4 text-gray-800">🔥 Top 5 Requested Books</h3>
-            <table class="min-w-full text-left">
-                <thead>
-                    <tr class="border-b">
-                        <th class="py-2">Title</th>
-                        <th class="py-2 text-right">Count</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for book in top_books %}
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="py-2 text-gray-700 truncate max-w-xs">{{ book.book__title }}</td>
-                        <td class="py-2 text-right font-bold">{{ book.count }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="2" class="py-2 text-gray-500">No data available.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="p-6 border-b border-slate-100 bg-slate-50/50">
+                <h3 class="text-lg font-bold text-slate-800">🔥 Most Requested Books</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 text-xs uppercase text-slate-500 font-semibold">
+                        <tr>
+                            <th class="px-6 py-4">Title</th>
+                            <th class="px-6 py-4 text-right">Requests</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for book in top_books %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 text-sm font-medium text-slate-700 truncate max-w-[200px]">{{
+                                book.book__title }}</td>
+                            <td class="px-6 py-4 text-sm text-right font-bold text-slate-800">{{ book.count }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2" class="px-6 py-8 text-center text-slate-400 text-sm">No data available yet.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- Top Members -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-            <h3 class="text-xl font-bold mb-4 text-gray-800">🏆 Top Active Members</h3>
-            <table class="min-w-full text-left">
-                <thead>
-                    <tr class="border-b">
-                        <th class="py-2">Name</th>
-                        <th class="py-2 text-right">Requests</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for m in top_members %}
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="py-2 text-gray-700">{{ m.full_name }}</td>
-                        <td class="py-2 text-right font-bold">{{ m.count }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="2" class="py-2 text-gray-500">No data available.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="p-6 border-b border-slate-100 bg-slate-50/50">
+                <h3 class="text-lg font-bold text-slate-800">🏆 Top Active Members</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 text-xs uppercase text-slate-500 font-semibold">
+                        <tr>
+                            <th class="px-6 py-4">Member Name</th>
+                            <th class="px-6 py-4 text-right">Requests</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for m in top_members %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-6 py-4 text-sm font-medium text-slate-700">{{ m.full_name }}</td>
+                            <td class="px-6 py-4 text-sm text-right font-bold text-slate-800">{{ m.count }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2" class="px-6 py-8 text-center text-slate-400 text-sm">No data available yet.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -119,6 +198,9 @@
     const pieData = JSON.parse(document.getElementById('pie-data-data').textContent);
     const pieLabels = JSON.parse(document.getElementById('pie-labels-data').textContent);
 
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color = '#64748b';
+
     // Line Chart
     new Chart(document.getElementById('timeChart'), {
         type: 'line',
@@ -128,15 +210,28 @@
                 label: 'Requests',
                 data: timeData,
                 borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                borderWidth: 2,
                 tension: 0.4,
-                fill: true
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6
             }]
         },
-        options: { responsive: true }
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { grid: { borderDash: [2, 2], drawBorder: false }, beginAtZero: true },
+                x: { grid: { display: false } }
+            }
+        }
     });
 
-    // Pie Chart
+    // Donut Chart
     new Chart(document.getElementById('pieChart'), {
         type: 'doughnut',
         data: {
@@ -144,7 +239,17 @@
             datasets: [{
                 data: pieData,
                 backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#6b7280'],
+                borderWidth: 0,
+                hoverOffset: 4
             }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20 } }
+            },
+            cutout: '75%'
         }
     });
 </script>

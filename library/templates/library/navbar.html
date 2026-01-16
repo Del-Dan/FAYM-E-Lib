@@ -1,11 +1,21 @@
-<nav class="bg-white shadow-sm border-b border-slate-200">
-    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+<nav class="bg-white/80 backdrop-blur-md border-b border-divider sticky top-0 z-40 transition-all duration-300">
+    <div class="container mx-auto px-6 h-16 flex justify-between items-center">
+        <!-- Logo: Simple Wordmark -->
         <a href="/"
-            class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">FAYM
-            Library</a>
-        <div>
-            <!-- Admin Link for demo -->
-            <a href="/admin/" class="text-slate-600 hover:text-blue-600 font-medium">Admin</a>
+            class="text-xl font-bold tracking-tight text-slate-900 hover:text-primary transition-colors flex items-center gap-2">
+            <span class="w-2 h-8 bg-primary rounded-full"></span>
+            FAYM Library
+        </a>
+
+        <!-- Right Side -->
+        <div class="flex items-center gap-6">
+            <!-- Admin Link: Discreet -->
+            <a href="/admin/" class="text-sm font-medium text-slate-500 hover:text-primary transition-colors">
+                Admin
+            </a>
+
+            <!-- Optional User Avatar or Profile Placeholder if needed in future -->
+            <!-- <div class="w-8 h-8 bg-slate-100 rounded-full"></div> -->
         </div>
     </div>
 </nav>
