@@ -16,78 +16,116 @@
 {% block content %}
 <div class="bg-slate-50 min-h-screen p-6 md:p-10 font-sans">
 
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-10">
+    <!-- Header & Filters -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
             <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">Analytics Overview</h1>
             <p class="text-slate-500 mt-1">Real-time insights into library performance.</p>
         </div>
-        <div class="bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200 text-sm font-medium text-slate-600">
-            Current Session: <span class="text-green-600">Active</span>
+
+        <div class="flex gap-3">
+            <!-- Year Filter -->
+            <form method="GET" class="flex gap-2" id="filterRequests">
+                <select name="year" onchange="this.form.submit()"
+                    class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 focus:border-primary outline-none">
+                    <option value="">All Years</option>
+                    {% for y in available_years %}
+                    <option value="{{ y }}" {% if selected_year==y %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+                <select name="month" onchange="this.form.submit()"
+                    class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 focus:border-primary outline-none">
+                    <option value="">All Months</option>
+                    {% for m in "123456789101112"|make_list %}
+                    <option value="{{ forloop.counter }}" {% if selected_month==forloop.counter %}selected{% endif %}>
+                        Month {{ forloop.counter }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+
+            <div
+                class="bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200 text-sm font-medium text-slate-600 flex items-center">
+                Session: <span class="text-green-600 ml-1">Active</span>
+            </div>
         </div>
     </div>
 
     <!-- KPI Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-10">
         <!-- Card 1 -->
         <div
             class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
             <div class="flex items-center justify-between mb-4">
-                <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                 </div>
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Requests</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total</span>
             </div>
-            <p class="text-4xl font-black text-slate-800">{{ total_requests }}</p>
+            <p class="text-3xl font-black text-slate-800">{{ total_requests }}</p>
         </div>
 
         <!-- Card 2 -->
         <div
             class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
             <div class="flex items-center justify-between mb-4">
-                <div class="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Approved</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Approved</span>
             </div>
-            <p class="text-4xl font-black text-slate-800">{{ approved_count }}</p>
+            <p class="text-3xl font-black text-slate-800">{{ approved_count }}</p>
         </div>
 
         <!-- Card 3 -->
         <div
             class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
             <div class="flex items-center justify-between mb-4">
-                <div class="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Pending</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pending</span>
             </div>
-            <p class="text-4xl font-black text-slate-800">{{ pending_count }}</p>
+            <p class="text-3xl font-black text-slate-800">{{ pending_count }}</p>
         </div>
 
-        <!-- Card 4 (Lead Time) -->
+        <!-- Card 4 (Missed / Expired) -->
         <div
             class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
             <div class="flex items-center justify-between mb-4">
-                <div class="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Missed</span>
+            </div>
+            <p class="text-3xl font-black text-slate-800">{{ missed_count }}</p>
+            <p class="text-[10px] text-slate-400 mt-1">Expired Requests (5h+)</p>
+        </div>
+
+        <!-- Card 5 (Lead Time) -->
+        <div
+            class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
+            <div class="flex items-center justify-between mb-4">
+                <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                 </div>
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Avg. Lead Time</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Avg Lead Time</span>
             </div>
-            <p class="text-4xl font-black text-slate-800">{{ lead_time }}</p>
-            <p class="text-xs text-slate-400 mt-1">Request to Approval</p>
+            <p class="text-3xl font-black text-slate-800">{{ lead_time }}</p>
         </div>
     </div>
 

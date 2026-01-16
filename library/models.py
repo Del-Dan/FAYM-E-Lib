@@ -26,7 +26,9 @@ class Book(models.Model):
     ]
     AVAILABILITY_CHOICES = [
         ('Available', 'Available'),
-        ('Not Available', 'Not Available'),
+        ('On Hold', 'On Hold'),
+        ('Taken', 'Taken'),
+        ('Not Available', 'Not Available'), # Keep for legacy/manual
     ]
 
     book_id = models.AutoField(primary_key=True)
@@ -98,6 +100,7 @@ class BookRequest(models.Model):
         ('Pending', 'Pending'),
         ('Approved', 'Approved'),
         ('Not Approved', 'Not Approved'),
+        ('Expired', 'Expired'),
     ]
     RETURN_STATUS_CHOICES = [
         ('Returned', 'Returned'),
@@ -133,17 +136,43 @@ class BookRequest(models.Model):
         if not self.token:
             self.token = str(uuid.uuid4())
         
-        # Auto-calculate expected return date if delivery date is set
-        if self.delivery_date and self.book and self.book.type == 'HC' and not self.expected_return_date:
-            self.expected_return_date = self.delivery_date + timedelta(days=self.book.duration_days)
-            
         # SC logic: No return status
         if self.book and self.book.type == 'SC':
             self.return_status = 'N/A'
+            if self.approval_status == 'Approved' and not self.approval_date:
+                self.approval_date = timezone.now()
+
+        # HC Logic: State Machine
+        if self.book and self.book.type == 'HC':
+            # 1. On Hold Logic (Pending)
+            if self.approval_status == 'Pending':
+                 if self.book.availability == 'Available':
+                     self.book.availability = 'On Hold'
+                     self.book.save()
             
-        # Auto-set Approval Date
-        if self.approval_status == 'Approved' and not self.approval_date:
-            self.approval_date = timezone.now()
+            # 2. Taken Logic (Approved)
+            elif self.approval_status == 'Approved':
+                 if not self.approval_date:
+                     self.approval_date = timezone.now()
+                 if not self.delivery_date:
+                     self.delivery_date = timezone.now() # Default to now if not set
+                     
+                 # Auto-calculate expected return date
+                 if not self.expected_return_date:
+                     self.expected_return_date = self.delivery_date + timedelta(days=self.book.duration_days)
+                 
+                 self.book.availability = 'Taken'
+                 self.book.save()
+
+            # 3. Released Logic (Rejected/Expired/Invalid)
+            elif self.approval_status in ['Not Approved', 'Expired'] or self.request_status == 'Invalid':
+                 self.book.availability = 'Available'
+                 self.book.save()
+                 
+            # 4. Returned Logic
+            if self.return_status == 'Returned':
+                 self.book.availability = 'Available'
+                 self.book.save()
             
         super().save(*args, **kwargs)
 

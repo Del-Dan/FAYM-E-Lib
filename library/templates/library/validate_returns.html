@@ -1,0 +1,71 @@
+{% extends 'library/base.html' %}
+
+{% block content %}
+<div class="max-w-xl mx-auto mt-12 bg-white rounded-2xl shadow-premium p-10 border border-slate-100">
+
+    <div class="text-center mb-8">
+        <h1 class="text-2xl font-bold text-slate-800">Validate Returns</h1>
+        <p class="text-slate-500">Enter the Request Token to process a returned book.</p>
+    </div>
+
+    <!-- Step 1: Search -->
+    <form method="POST" class="space-y-4 mb-8">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="search">
+        <div class="flex gap-2">
+            <input type="text" name="token" placeholder="Enter Token (e.g. uuid...)"
+                class="flex-1 px-4 py-3 border border-slate-200 rounded-xl focus:border-primary outline-none" required>
+            <button type="submit"
+                class="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors">
+                Search
+            </button>
+        </div>
+    </form>
+
+    <hr class="border-slate-100 my-8">
+
+    <!-- Step 2: Result & Confirm -->
+    {% if search_result %}
+    <div class="bg-slate-50 rounded-xl p-6 border border-slate-100">
+        <h3 class="text-lg font-bold text-slate-800 mb-4">Request Details</h3>
+
+        <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+                <span class="text-slate-500">Book:</span>
+                <span class="font-medium text-slate-900">{{ search_result.book.title }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-slate-500">Member:</span>
+                <span class="font-medium text-slate-900">{{ search_result.full_name }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-slate-500">Expected Return:</span>
+                <span class="font-medium text-slate-900">{{ search_result.expected_return_date|date:"M d, Y" }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-slate-500">Status:</span>
+                <span
+                    class="font-bold {% if search_result.return_status == 'Overdue' %}text-red-500{% else %}text-amber-500{% endif %}">
+                    {{ search_result.return_status }}
+                </span>
+            </div>
+        </div>
+
+        <form method="POST" class="mt-8">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="confirm_return">
+            <input type="hidden" name="token" value="{{ search_result.token }}">
+
+            <button type="submit"
+                class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                Confirm Return
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

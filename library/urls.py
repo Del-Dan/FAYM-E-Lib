@@ -11,4 +11,5 @@ urlpatterns = [
     path('send-otp/', views.send_otp, name='send_otp'),
     path('verify-otp/', views.verify_otp_action, name='verify_otp'),
     path('dashboard/', views.admin_dashboard_view, name='admin_dashboard'),
+    path('validate-returns/', views.validate_returns, name='validate_returns'),
 ]

@@ -362,21 +362,20 @@ def verify_wigal_otp(phone, code):
 # --- OTP Views ---
 
 def send_otp(request):
-    """HTMX View to trigger OTP sending."""
+    """HTMX View to trigger OTP sending via EMAIL lookup."""
     identity = request.POST.get('identity', '').strip()
     
-    # Check Member
-    member = Member.objects.filter(
-        Q(email__iexact=identity) | 
-        Q(mobile_number__iexact=identity)
-    ).first()
+    # 1. Lookup by EMAIL explicitly as requested
+    member = Member.objects.filter(email__iexact=identity).first()
     
     if not member:
-        return JsonResponse({'status': 'error', 'message': 'Member not found.'})
+        # Fallback: Try Phone just in case, but prefer Email
+        member = Member.objects.filter(mobile_number__iexact=identity).first()
+        
+    if not member:
+        return JsonResponse({'status': 'error', 'message': 'Member email not found in directory.'})
     
-    # Generate Code via Wigal (or self-generate if Wigal just sends msg)
-    # Wigal Generate endpoint actually returns the code it sent? 
-    # Yes, based on docs it returns {status, message, otpcode}.
+    # Generate Code via Wigal
     otp_code = generate_wigal_otp(member.mobile_number)
     
     if otp_code:
@@ -390,84 +389,13 @@ def send_otp(request):
             expires_at=timezone.now() + timedelta(minutes=5)
         )
         
-        # We still rely on user session to know WHICH phone they are claiming to be
+        # Session storage
         request.session['otp_phone'] = member.mobile_number
-        return JsonResponse({'status': 'sent', 'message': f'OTP sent to {member.mobile_number}'})
+        # Mask phone for user feedback
+        masked_phone = f"{member.mobile_number[:3]}****{member.mobile_number[-3:]}"
+        return JsonResponse({'status': 'sent', 'message': f'OTP sent to registered phone ({masked_phone})'})
     else:
-        return JsonResponse({'status': 'error', 'message': 'Failed to send OTP.'})
-
-def verify_otp_action(request):
-    """HTMX View to verify OTP input."""
-    code = request.POST.get('otp_code', '').strip()
-    phone = request.session.get('otp_phone')
-    
-    if not phone:
-         return JsonResponse({'status': 'error', 'message': 'Session expired. Request OTP again.'})
-         
-    # DB Verification
-    record = OTPRecord.objects.filter(
-        phone_number=phone,
-        otp_code=code,
-        is_verified=False,
-        expires_at__gt=timezone.now()
-    ).first()
-    
-    if record:
-        record.is_verified = True
-        record.save()
-        
-        # Set Session (30 mins)
-        request.session['is_verified'] = True
-        request.session['verified_identity'] = phone
-        request.session['session_expiry'] = (timezone.now() + timedelta(minutes=30)).isoformat()
-        return JsonResponse({'status': 'success', 'message': 'Verified!'})
-    else:
-        return JsonResponse({'status': 'error', 'message': 'Invalid or Expired OTP.'})
-
-def check_request_limits(member, book_type):
-    """
-    Enforce limits:
-    - SC: Max 2 per week, Max 4 per month.
-    - HC: Max 1 active request until returned.
-    """
-    now = timezone.now()
-    email = member.email
-    
-    if book_type == 'SC':
-        # Check Weekly (Last 7 days)
-        week_ago = now - timedelta(days=7)
-        week_count = BookRequest.objects.filter(
-            email=email, 
-            book__type='SC', 
-            timestamp__gte=week_ago
-        ).count()
-        
-        if week_count >= 2:
-            return "Limit Reached: You can only request 2 Soft Copy books per week."
-            
-        # Check Monthly (Last 30 days)
-        month_ago = now - timedelta(days=30)
-        month_count = BookRequest.objects.filter(
-            email=email, 
-            book__type='SC', 
-            timestamp__gte=month_ago
-        ).count()
-        
-        if month_count >= 4:
-            return "Limit Reached: You can only request 4 Soft Copy books per month."
-            
-    elif book_type == 'HC':
-        # Check Active HC requests (Not Returned)
-        # Assuming 'Returned' or 'N/A' means closed.
-        active_hc = BookRequest.objects.filter(
-            email=email,
-            book__type='HC'
-        ).exclude(return_status='Returned').exists()
-        
-        if active_hc:
-            return "Limit Reached: You have an unreturned Hard Copy book. Please return it first."
-            
-    return None
+        return JsonResponse({'status': 'error', 'message': 'System error sending OTP.'})
 
 def submit_request(request):
     if request.method == 'POST':
@@ -482,7 +410,6 @@ def submit_request(request):
         # Check Expiry
         expiry_dt = datetime.datetime.fromisoformat(session_expiry)
         if timezone.now() > expiry_dt:
-             # Expired
              del request.session['is_verified']
              del request.session['session_expiry']
              messages.error(request, "Security Session Expired. Please verify via OTP.")
@@ -490,19 +417,15 @@ def submit_request(request):
         # --------------------------
 
         book_id = request.POST.get('book_id')
-        identity = request.POST.get('identity') # Email or Phone
-        full_name = request.POST.get('full_name') # Optional check?
+        identity = request.POST.get('identity') # This is the Email
         
         book = get_object_or_404(Book, book_id=book_id)
         
-        # Validate Member
-        member = Member.objects.filter(
-            Q(email__iexact=identity) | 
-            Q(mobile_number__iexact=identity)
-        ).first()
+        # Validate Member by Email
+        member = Member.objects.filter(email__iexact=identity).first()
         
         if not member:
-            messages.error(request, "Access Denied: You are not a registered member of the ministry.")
+            messages.error(request, "Authentication Error: Member profile not found.")
             return redirect('index')
             
         # --- NEW: Request Limits Check ---
@@ -513,8 +436,9 @@ def submit_request(request):
         # ---------------------------------
 
         # Create Request
+        # Note: If HC, model.save() will auto-set Book to 'On Hold'
         req = BookRequest.objects.create(
-            member=member, # Link Relational Data
+            member=member,
             full_name=f"{member.firstname} {member.surname}",
             email=member.email,
             book=book,
@@ -527,35 +451,37 @@ def submit_request(request):
             req.approval_status = 'Approved'
             req.save()
             
-            # Message
-            sms_msg = f"Request Received. Token: {req.token}. Link: {book.location}"
-            email_body = f"Hello {member.firstname},\n\nYour request for '{book.title}' is approved.\n\nToken: {req.token}\nLink: {book.location}\n\nFAYM Library"
+            # Professional Message
+            sms_msg = f"FAYM Library: Request Approved.\nToken: {req.token}\nAccess your copy here: {book.location}"
+            email_body = f"Hello {member.firstname},\n\nYour request for '{book.title}' has been automatically approved.\n\nToken: {req.token}\nAccess Link: {book.location}\n\nHappy Reading!\nFAYM Library"
             
-            # Send
             threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
             try:
-                send_mail(f"Approved: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
+                send_mail(f"Access Granted: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
             except: pass
             
-        # === SCENARIO 2: HARD COPY (Availability Check) ===
+        # === SCENARIO 2: HARD COPY (On Hold Logic) ===
         else:
-            # Check if available
-            if book.availability != 'Available':
-                # This should logically prevent request, but if they get here:
-                messages.error(request, f"Book is currently unavailable. Check back later.")
-                req.delete() # Undo creation
-                return redirect('index')
+            # Check availability (Double check, though Request button handles UI)
+            # The model save() already set it "On Hold" if it was "Available".
+            # If it was already Taken/On Hold by race condition, we should handle that.
             
-            # Available -> Pending Approval
-            sms_msg = f"Request Received. Token: {req.token}. We will contact you shortly."
-            email_body = f"Hello {member.firstname},\n\nWe received your request for '{book.title}'.\nToken: {req.token}\n\nWe will contact you shortly for pickup.\n\nFAYM Library"
+            if book.availability == 'Taken': 
+                 # Race condition caught
+                 req.delete()
+                 messages.error(request, "Sorry, this book was just taken by someone else.")
+                 return redirect('index')
+
+            # Professional Message
+            sms_msg = f"FAYM Library: Request Received.\nToken: {req.token}\nWe will contact you shortly regarding pickup."
+            email_body = f"Hello {member.firstname},\n\nWe have received your request for '{book.title}'.\nToken: {req.token}\n\nYour request is valid for 5 Hours. We will facilitate pickup shortly.\n\nFAYM Library"
             
             threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
             try:
-                send_mail(f"Received: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
+                send_mail(f"Request Pending: {book.title}", email_body, settings.EMAIL_HOST_USER if hasattr(settings, 'EMAIL_HOST_USER') else 'noreply@faymlib.com', [member.email])
             except: pass
             
-        messages.success(request, f"Request received! Token: {req.token}")
+        messages.success(request, f"Request Successful! Token: {req.token}")
         return redirect('index')
         
     return redirect('index')
@@ -563,22 +489,51 @@ def submit_request(request):
 @staff_member_required
 def admin_dashboard_view(request):
     """
-    Detailed Analytics Dashboard for Stats & Insights.
+    Detailed Analytics Dashboard with Auto-Expiry Logic.
     """
-    # 1. KPI Counts
-    total_requests = BookRequest.objects.count()
-    approved_count = BookRequest.objects.filter(approval_status='Approved').count()
-    pending_count = BookRequest.objects.filter(approval_status='Pending').count()
-    active_members = Member.objects.count() # Total database members
     
-    # 1b. Lead Time (Avg Duration from Request to Approval)
-    from django.db.models import Avg, F, DurationField, ExpressionWrapper
-    # SQLite/Postgres difference in duration math. Django handles it mostly.
-    # We only care about Approved ones with a date.
-    # Note: If approval_date is null, we skip.
+    # --- AUTO-EXPIRY LOGIC (5 HOURS) ---
+    # Check for Pending HC Requests older than 5 hours
+    expiry_threshold = timezone.now() - timedelta(hours=5)
+    expired_requests = BookRequest.objects.filter(
+        approval_status='Pending',
+        book__type='HC',
+        timestamp__lt=expiry_threshold
+    )
     
-    valid_approvals = BookRequest.objects.filter(approval_status='Approved', approval_date__isnull=False)
-    # Python calc is often safer for cross-db compatibility with durations if volume is low.
+    count_expired = 0
+    if expired_requests.exists():
+        for req in expired_requests:
+            req.approval_status = 'Expired'
+            req.save() # This triggers Book -> 'Available' in model.save()
+            count_expired += 1
+        print(f"Auto-Expired {count_expired} requests.")
+    # -----------------------------------
+
+    # --- FILTERS ---
+    month = request.GET.get('month')
+    year = request.GET.get('year')
+    current_year = datetime.datetime.now().year
+    
+    # Base Queryset
+    qs = BookRequest.objects.all()
+    
+    if year:
+        qs = qs.filter(timestamp__year=year)
+    if month:
+        qs = qs.filter(timestamp__month=month)
+        
+    # 1. KPI Counts (Filtered)
+    total_requests = qs.count()
+    approved_count = qs.filter(approval_status='Approved').count()
+    pending_count = qs.filter(approval_status='Pending').count()
+    active_members = Member.objects.count() 
+    
+    # Missed Opportunities (Expired)
+    missed_count = qs.filter(approval_status='Expired').count()
+    
+    # 1b. Lead Time
+    valid_approvals = qs.filter(approval_status='Approved', approval_date__isnull=False)
     lead_times = [(r.approval_date - r.timestamp).total_seconds() for r in valid_approvals]
     
     if lead_times:
@@ -588,46 +543,59 @@ def admin_dashboard_view(request):
     else:
         lead_time_display = "N/A"
 
-    # 2. Top Books (Most Requested)
-    top_books = BookRequest.objects.values('book__title').annotate(count=Count('id')).order_by('-count')[:5]
+    # 2. Top Books (Flattened Title Context)
+    top_books = qs.values('book__title').annotate(count=Count('id')).order_by('-count')[:5]
+    # Rename key for template simplicity if needed, but template can use book__title
+    
+    # 3. Top Members
+    top_members = qs.values('full_name').annotate(count=Count('id')).order_by('-count')[:5]
 
-    # 3. Top Members (Most Active)
-    top_members = BookRequest.objects.values('full_name').annotate(count=Count('id')).order_by('-count')[:5]
-
-    # 4. Pie Chart Data (Status Distribution)
-    status_counts = BookRequest.objects.values('approval_status').annotate(count=Count('id'))
+    # 4. Pie Chart Data
+    status_counts = qs.values('approval_status').annotate(count=Count('id'))
     pie_labels = [item['approval_status'] for item in status_counts]
     pie_data = [item['count'] for item in status_counts]
 
-    # 5. Line Chart (Requests over last 30 days)
-    # Group by date
-    last_30_days = timezone.now() - timedelta(days=30)
-    
-    # SQLite/Postgres date truncation varies. 
-    # For safety/portability, we'll fetch and process in python (if dataset is small < 10k) OR use distinct logic.
-    daily_qs = BookRequest.objects.filter(timestamp__gte=last_30_days).values_list('timestamp', flat=True)
-    
-    # Process dates
-    from collections import defaultdict
-    date_map = defaultdict(int)
-    for ts in daily_qs:
-        date_str = ts.strftime('%Y-%m-%d')
-        date_map[date_str] += 1
+    # 5. Line Chart (Requests over time - respect filter or default to 30 days)
+    if month or year:
+        # If filter active, show daily trend for that period
+        chart_qs = qs.order_by('timestamp')
+        date_map = defaultdict(int)
+        for req in chart_qs:
+             d_str = req.timestamp.strftime('%Y-%m-%d')
+             date_map[d_str] += 1
         
-    # Generate continuous timeline
-    time_labels = []
-    time_data = []
-    current = last_30_days
-    while current <= timezone.now():
-        d_str = current.strftime('%Y-%m-%d')
-        time_labels.append(d_str)
-        time_data.append(date_map[d_str])
-        current += timedelta(days=1)
+        # Sort labels
+        time_labels = sorted(date_map.keys())
+        time_data = [date_map[d] for d in time_labels]
+        
+    else:
+        # Default: Last 30 days
+        last_30_days = timezone.now() - timedelta(days=30)
+        daily_qs = BookRequest.objects.filter(timestamp__gte=last_30_days).values_list('timestamp', flat=True)
+        
+        date_map = defaultdict(int)
+        for ts in daily_qs:
+            date_str = ts.strftime('%Y-%m-%d')
+            date_map[date_str] += 1
+            
+        time_labels = []
+        time_data = []
+        current = last_30_days
+        while current <= timezone.now():
+            d_str = current.strftime('%Y-%m-%d')
+            time_labels.append(d_str)
+            time_data.append(date_map[d_str])
+            current += timedelta(days=1)
+
+    # Years for Filter
+    years = BookRequest.objects.dates('timestamp', 'year')
+    available_years = [d.year for d in years]
 
     context = {
         'total_requests': total_requests,
         'approved_count': approved_count,
         'pending_count': pending_count,
+        'missed_count': missed_count, # New Metric
         'active_members': active_members,
         'lead_time': lead_time_display,
         'top_books': top_books,
@@ -636,6 +604,50 @@ def admin_dashboard_view(request):
         'pie_data': pie_data,
         'time_labels': time_labels,
         'time_data': time_data,
-        'title': 'Analytics Dashboard'
+        'title': 'Analytics Dashboard',
+        'available_years': available_years,
+        'selected_year': int(year) if year else None,
+        'selected_month': int(month) if month else None
     }
     return render(request, 'admin_dashboard.html', context)
+
+@staff_member_required
+def validate_returns(request):
+    """
+    Dedicated View for Bib Lit members to validate returned books.
+    """
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        token = request.POST.get('token', '').strip()
+        
+        if action == 'search':
+            if not token:
+                messages.error(request, "Please enter a Token.")
+            else:
+                try:
+                    req = BookRequest.objects.get(token=token, book__type='HC')
+                    return render(request, 'library/validate_returns.html', {'search_result': req})
+                except BookRequest.DoesNotExist:
+                    messages.error(request, "Invalid Token or Not a Hard Copy Request.")
+                    
+        elif action == 'confirm_return':
+            try:
+                req = BookRequest.objects.get(token=token)
+                
+                # Update Request
+                req.return_status = 'Returned'
+                req.save() # Triggers Book -> Available in models.save()
+                
+                # Log Action
+                ValidateReturns.objects.create(
+                    bib_lit_member=request.user.username,
+                    action='Return',
+                    request_token=token
+                )
+                
+                messages.success(request, f"Book '{req.book.title}' marked as Returned successfully.")
+                return redirect('validate_returns')
+            except Exception as e:
+                messages.error(request, f"Error: {e}")
+                
+    return render(request, 'library/validate_returns.html')

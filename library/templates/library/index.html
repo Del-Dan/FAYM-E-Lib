@@ -31,7 +31,6 @@
                     <option value="all">Check All</option>
                     <option value="title">Title</option>
                     <option value="author">Author</option>
-                    <option value="keywords">Keywords</option>
                 </select>
                 <!-- Custom Arrow -->
                 <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
@@ -127,11 +126,11 @@
                 <div x-show="step === 1" x-transition:enter="transition ease-out duration-300 transform"
                     x-transition:enter-start="opacity-0 translate-x-10"
                     x-transition:enter-end="opacity-100 translate-x-0">
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Mobile
-                        Number</label>
-                    <input type="text" name="identity" x-model="identity" @keyup.debounce.500ms="checkMember()"
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Email
+                        Address</label>
+                    <input type="email" name="identity" x-model="identity" @keyup.debounce.500ms="checkMember()"
                         class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all text-slate-800 placeholder-slate-300 font-medium"
-                        placeholder="e.g. 055..." required>
+                        placeholder="e.g. member@email.com" required>
 
                     <div class="flex justify-between items-center mt-3 h-6">
                         <p x-show="identity.length > 3" class="text-xs font-semibold transition-colors"
