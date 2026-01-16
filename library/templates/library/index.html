@@ -71,7 +71,7 @@
 <!-- REQUEST MODAL (Premium) -->
 <div x-data="requestModal"
     @open-request-modal.window="open = true; bookId = $event.detail.id; bookTitle = $event.detail.title; reset();"
-    x-show="open" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition.opacity>
+    x-show="open" class="fixed inset-0 z-[155] overflow-y-auto" style="display: none;" x-transition.opacity>
 
     <!-- Toast UI (Top Right) -->
     <div x-show="toast.show" x-transition:enter="transition ease-out duration-300"
@@ -91,8 +91,8 @@
     <!-- Backdrop -->
     <div class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity" @click="open = false"></div>
 
-    <!-- Modal Card -->
-    <div class="relative min-h-screen flex items-center justify-center p-4 overflow-y-auto">
+    <!-- Modal Card Wrapper -->
+    <div class="flex min-h-full items-center justify-center p-4">
         <div
             class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-10 relative overflow-hidden transform transition-all">
 
