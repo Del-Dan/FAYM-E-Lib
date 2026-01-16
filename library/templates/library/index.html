@@ -68,6 +68,9 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block modals %}
 <!-- REQUEST MODAL (Premium) -->
 <div x-data="requestModal"
     @open-request-modal.window="open = true; bookId = $event.detail.id; bookTitle = $event.detail.title; reset();"
