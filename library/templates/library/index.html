@@ -62,55 +62,7 @@
 
 <!-- Request Modal (Global) - Utilizing Alpine for state -->
 <!-- Request Modal (Global) - Multi-step OTP Flow -->
-<div x-data="{ 
-    open: false, 
-    step: 1, 
-    bookId: '', 
-    bookTitle: '', 
-    identity: '', 
-    otpCode: '', 
-    isValidMember: false, 
-    isLoading: false,
-    csrf: document.querySelector('[name=csrfmiddlewaretoken]').value,
-    
-    // Toast State
-    toast: { show: false, msg: '', type: 'success' },
-    
-    showToast(message, type = 'success') {
-        this.toast.msg = message;
-        this.toast.type = type;
-        this.toast.show = true;
-        setTimeout(() => { this.toast.show = false }, 4000);
-    },
-    
-    reset() {
-        this.step = 1;
-        this.identity = '';
-        this.otpCode = '';
-        this.isValidMember = false;
-        this.isLoading = false;
-    },
-    
-    async checkMember() {
-        if (this.identity.length < 3) return;
-        try {
-            let res = await fetch(`{% url 'check_member' %}?identity=${this.identity}`);
-            if (!res.ok) throw new Error('Server Error');
-            let data = await res.json();
-            this.isValidMember = data.valid;
-        } catch (e) {
-            console.error(e);
-            this.showToast(" Connection Error", 'error' ); } }, async sendOtp() { this.isLoading=true; let fd=new
-    FormData(); fd.append('identity', this.identity); fd.append('csrfmiddlewaretoken', this.csrf); try { let res=await
-    fetch(`{% url 'send_otp' %}`, { method: 'POST' , body: fd }); if (!res.ok) throw new Error('Server Error'); let
-    data=await res.json(); if (data.status==='sent' ) { this.showToast(data.message, 'success' ); this.step=2; } else {
-    this.showToast(data.message, 'error' ); } } catch (e) { console.error(e); this.showToast("Failed to connect to
-    server.", 'error' ); } finally { this.isLoading=false; } }, async verifyOtp() { this.isLoading=true; let fd=new
-    FormData(); fd.append('otp_code', this.otpCode); fd.append('csrfmiddlewaretoken', this.csrf); try { let res=await
-    fetch(`{% url 'verify_otp' %}`, { method: 'POST' , body: fd }); if (!res.ok) throw new Error('Server Error'); let
-    data=await res.json(); if (data.status==='success' ) { this.showToast(data.message, 'success' ); this.step=3; } else
-    { this.showToast(data.message, 'error' ); } } catch (e) { console.error(e); this.showToast("Failed to verify
-    code.", 'error' ); } finally { this.isLoading=false; } } }"
+<div x-data="requestModal"
     @open-request-modal.window="open = true; bookId = $event.detail.id; bookTitle = $event.detail.title; reset();"
     x-show="open" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition.opacity>
 
@@ -154,7 +106,8 @@
 
                     <p x-show="identity.length > 3" class="text-xs mt-1"
                         :class="isValidMember ? 'text-green-600' : 'text-red-500'"
-                        x-text="isValidMember ? 'Member Verified' : 'Checking...'"></p>
+                        x-text="isValidMember ? 'Member Verified' : 'Checking...'">
+                    </p>
 
                     <button type="button" x-show="isValidMember" @click="sendOtp()" :disabled="isLoading"
                         class="w-full mt-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors">
@@ -162,8 +115,8 @@
                         <span x-show="isLoading">Sending OTP...</span>
                     </button>
 
-                    <div x-show="!isValidMember && identity.length > 8" class="mt-2 text-sm text-red-500">
-                        Member not found. Check digits or register.
+                    <div x-show="!isValidMember && identity.length > 8 && !isLoading" class="mt-2 text-sm text-red-500">
+                        Member not found. Check digits.
                     </div>
                 </div>
 
@@ -216,4 +169,101 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('requestModal', () => ({
+            open: false,
+            step: 1,
+            bookId: '',
+            bookTitle: '',
+            identity: '',
+            otpCode: '',
+            isValidMember: false,
+            isLoading: false,
+            csrf: document.querySelector('[name=csrfmiddlewaretoken]').value,
+
+            toast: { show: false, msg: '', type: 'success' },
+
+            showToast(message, type = 'success') {
+                this.toast.msg = message;
+                this.toast.type = type;
+                this.toast.show = true;
+                setTimeout(() => { this.toast.show = false }, 4000);
+            },
+
+            reset() {
+                this.step = 1;
+                this.identity = '';
+                this.otpCode = '';
+                this.isValidMember = false;
+                this.isLoading = false;
+            },
+
+            async checkMember() {
+                if (this.identity.length < 3) return;
+                try {
+                    let res = await fetch(`{% url 'check_member' %}?identity=${this.identity}`);
+                    if (!res.ok) throw new Error('Server Error');
+                    let data = await res.json();
+                    this.isValidMember = data.valid;
+                } catch (e) {
+                    console.error(e);
+                    // Silent fail or toast
+                    this.showToast("Connection Error", 'error');
+                }
+            },
+
+            async sendOtp() {
+                this.isLoading = true;
+                let fd = new FormData();
+                fd.append('identity', this.identity);
+                fd.append('csrfmiddlewaretoken', this.csrf);
+
+                try {
+                    let res = await fetch(`{% url 'send_otp' %}`, { method: 'POST', body: fd });
+                    if (!res.ok) throw new Error('Server Error');
+
+                    let data = await res.json();
+                    if (data.status === 'sent') {
+                        this.showToast(data.message, 'success');
+                        this.step = 2;
+                    } else {
+                        this.showToast(data.message, 'error');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    this.showToast("Failed to connect to server.", 'error');
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            async verifyOtp() {
+                this.isLoading = true;
+                let fd = new FormData();
+                fd.append('otp_code', this.otpCode);
+                fd.append('csrfmiddlewaretoken', this.csrf);
+
+                try {
+                    let res = await fetch(`{% url 'verify_otp' %}`, { method: 'POST', body: fd });
+                    if (!res.ok) throw new Error('Server Error');
+
+                    let data = await res.json();
+                    if (data.status === 'success') {
+                        this.showToast(data.message, 'success');
+                        this.step = 3;
+                    } else {
+                        this.showToast(data.message, 'error');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    this.showToast("Failed to verify code.", 'error');
+                } finally {
+                    this.isLoading = false;
+                }
+            }
+        }));
+    });
+</script>
 {% endblock %}
