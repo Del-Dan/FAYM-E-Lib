@@ -62,23 +62,8 @@
         <datalist id="search-suggestions"></datalist>
     </div>
 
-    <!-- CATEGORY PILLS (Minimal) -->
-    <div class="flex flex-wrap justify-center gap-3">
-        <input type="hidden" name="category" x-model="category">
-        {% for cat in categories %}
-        <button
-            @click="category = category === '{{ cat }}' ? '' : '{{ cat }}'; $nextTick(() => htmx.trigger($el, 'change'))"
-            :class="category === '{{ cat }}' ? 'bg-primary text-white shadow-md transform -translate-y-0.5' : 'bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 border border-slate-100'"
-            class="px-4 py-2 rounded-full text-xs font-medium transition-all duration-200"
-            hx-get="{% url 'search_books' %}" hx-trigger="change" hx-target="#book-results"
-            hx-vals='js:{q: document.querySelector("[name=q]").value, category: category === "{{ cat }}" ? "{{ cat }}" : ""}'>
-            {{ cat }}
-        </button>
-        {% endfor %}
-    </div>
-
     <!-- RESULTS GRID -->
-    <div id="book-results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left mt-16">
+    <div id="book-results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left mt-8">
         {% include 'library/partials/book_list.html' %}
     </div>
 </div>
@@ -118,7 +103,8 @@
                         x-text="bookTitle"></span></p>
             </div>
 
-            <form action="{% url 'submit_request' %}" method="POST" class="space-y-6" @submit="isLoading = true">
+            <!-- FIX: Added .prevent to stop native submission -->
+            <form @submit.prevent="submitFinalRequest" class="space-y-6">
                 {% csrf_token %}
                 <input type="hidden" name="book_id" x-model="bookId">
 
@@ -318,14 +304,20 @@
                         // 1. Show Success Message
                         this.showToast(data.message, 'success');
 
-                        // 2. Close Modal Immediatey
+                        // 2. LIVE UI UPDATE: Update button to 'Unavailable' without reload
+                        const btn = document.getElementById(`btn-${this.bookId}`);
+                        if (btn) {
+                            btn.innerHTML = `<span class="flex items-center justify-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-red-400"></span>Pending Hold</span>`;
+                            btn.disabled = true;
+                            btn.className = "w-full py-2.5 bg-slate-50 text-slate-400 text-xs font-bold rounded-lg cursor-not-allowed border border-slate-100 transition-all";
+                        }
+
+                        // 3. Close Modal Immediately
                         this.open = false;
 
-                        // 3. Reset Form
+                        // 4. Reset Form
                         setTimeout(() => this.reset(), 500);
 
-                        // 4. Reload page (optional, to update book availability visually)
-                        // setTimeout(() => window.location.reload(), 1500); 
                     } else {
                         this.showToast(data.message, 'error');
                     }

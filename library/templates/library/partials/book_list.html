@@ -3,11 +3,11 @@
 <div
     class="group bg-white rounded-2xl shadow-premium hover:shadow-premium-hover transition-all duration-300 border border-transparent hover:border-slate-100 overflow-hidden flex flex-col h-full transform hover:-translate-y-1">
     <!-- Card Body -->
-    <div class="p-6 flex gap-6 flex-1 items-start">
+    <div class="p-4 flex gap-4 flex-1 items-start">
 
-        <!-- Cover Art (Premium) -->
+        <!-- Cover Art (Premium - Smaller) -->
         <div
-            class="w-24 h-36 flex-shrink-0 rounded-lg shadow-md overflow-hidden relative group-hover:scale-105 transition-transform duration-500 bg-slate-100">
+            class="w-20 h-32 flex-shrink-0 rounded-lg shadow-md overflow-hidden relative group-hover:scale-105 transition-transform duration-500 bg-slate-100">
             {% if book.cover_url %}
             <img src="{{ book.cover_url }}" alt="{{ book.title }}" class="w-full h-full object-cover">
             {% else %}
@@ -23,7 +23,7 @@
 
             <!-- Type Badge (Overlaid) -->
             <div class="absolute top-0 right-0">
-                <span class="inline-block px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm rounded-bl-lg
+                <span class="inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm rounded-bl-lg
                 {% if book.type == 'SC' %}bg-softpurple{% else %}bg-warmamber{% endif %}">
                     {{ book.type }}
                 </span>
@@ -36,13 +36,13 @@
             <div class="flex justify-end mb-1">
                 {% if book.is_available %}
                 <span
-                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-statusgreen-bg text-statusgreen text-[10px] font-bold tracking-wide">
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-statusgreen-bg text-statusgreen text-[9px] font-bold tracking-wide">
                     <span class="w-1.5 h-1.5 rounded-full bg-statusgreen animate-pulse"></span>
                     Available
                 </span>
                 {% else %}
                 <span
-                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-50 text-red-500 text-[10px] font-bold tracking-wide">
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-50 text-red-500 text-[9px] font-bold tracking-wide">
                     <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
                     Taken
                 </span>
@@ -50,26 +50,26 @@
             </div>
 
             <!-- Title & Author -->
-            <h3 class="text-xl font-bold text-slate-900 leading-snug mb-2 group-hover:text-primary transition-colors"
+            <h3 class="text-lg font-bold text-slate-900 leading-tight mb-1 group-hover:text-primary transition-colors"
                 title="{{ book.title }}">
                 {{ book.title }}
             </h3>
 
-            <p class="text-sm text-slate-500 font-medium mb-4">
+            <p class="text-xs text-slate-500 font-medium mb-3">
                 {{ book.author }}
             </p>
 
             <!-- Action Button -->
             <div class="mt-auto">
                 {% if book.is_available %}
-                <button
+                <button id="btn-{{ book.book_id }}"
                     @click="$dispatch('open-request-modal', { id: '{{ book.book_id }}', title: '{{ book.title|escapejs }}' })"
-                    class="w-full py-2.5 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:border-primary hover:text-primary hover:bg-primary-soft transition-all duration-200 flex items-center justify-center gap-2">
+                    class="w-full py-2 bg-white border border-slate-200 text-slate-600 text-xs font-bold rounded-lg hover:border-primary hover:text-primary hover:bg-primary-soft transition-all duration-200 flex items-center justify-center gap-2">
                     Request Copy
                 </button>
                 {% else %}
                 <button disabled
-                    class="w-full py-2.5 bg-slate-50 text-slate-300 text-xs font-bold rounded-lg cursor-not-allowed border border-slate-100">
+                    class="w-full py-2 bg-slate-50 text-slate-300 text-xs font-bold rounded-lg cursor-not-allowed border border-slate-100">
                     Unavailable
                 </button>
                 {% endif %}

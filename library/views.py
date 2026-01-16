@@ -541,8 +541,8 @@ def submit_request(request):
                  return JsonResponse({'status': 'error', 'message': 'Sorry, this book was just taken by someone else.'})
 
             # Professional Choice
-            sms_msg = f"Dear {member.firstname}, Request for '{book.title[:20]}...' received. Token: {req.token}. Please pickup within 5 hours."
-            email_body = f"Dear {member.firstname},\n\nWe have received your request for '{book.title}'.\n\nRequest Token: {req.token}\n\nPlease proceed to the library desk to pick up your copy. This request is valid for 5 hours.\n\nRegards,\nFAYM Library Team"
+            sms_msg = f"Dear {member.firstname}, Request for '{book.title[:20]}...' received. Token: {req.token}. Please pickup at the desk."
+            email_body = f"Dear {member.firstname},\n\nWe have received your request for '{book.title}'.\n\nRequest Token: {req.token}\n\nPlease proceed to the library desk to pick up your copy.\n\nRegards,\nFAYM Library Team"
             
             threading.Thread(target=send_sms_wigal, args=(member.mobile_number, sms_msg)).start()
             try:
