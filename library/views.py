@@ -31,7 +31,34 @@ def setup_permissions(request):
     
     return HttpResponse(f"Setup Complete. Group 'Librarians' created/updated with {len(perms)} permissions. You can now assign staff to this group in Admin.")
 
-from django.core.management import call_command
+# --- RATE LIMITER HELPER (Simple Cache Protocol) ---
+from django.core.cache import cache
+
+def rate_limit(key_prefix, limit=5, period=60):
+    """
+    Simple decorator-like checker. 
+    Returns True if allowed, False if blocked.
+    Tracks hits by IP address.
+    """
+    def check_limit(request):
+        # SECURE IP DETECTION (Railway/Proxy Support)
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0].strip()
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+            
+        cache_key = f"ratelimit_{key_prefix}_{ip}"
+        hits = cache.get(cache_key, 0)
+        
+        if hits >= limit:
+            return False
+            
+        cache.set(cache_key, hits + 1, period)
+        return True
+    return check_limit
+
+import secrets
 import io
 import csv
 import threading
@@ -168,19 +195,18 @@ def search_books(request):
     return render(request, 'library/partials/book_list.html', context)
 
 def suggest_books(request):
-    """HTMX view for search suggestions."""
+    """HTMX view for search suggestions. Returns JSON to prevent XSS."""
     query = request.GET.get('q', '')
     if len(query) < 2:
-        return HttpResponse('')
+        return JsonResponse([], safe=False)
         
     # Get top 5 matches
     books = Book.objects.filter(title__icontains=query)[:5]
     
-    options = ""
-    for book in books:
-        options += f'<option value="{book.title}"></option>'
+    # SECURE: Return data structure, not HTML string
+    data = [{'value': book.title} for book in books]
     
-    return HttpResponse(options)
+    return JsonResponse(data, safe=False)
 
 def check_member(request):
     """HTMX/API check if member exists AND if they are eligible for request."""
@@ -321,8 +347,9 @@ def bulk_import(request):
 # --- OTP Helper Functions (Unchanged) ---
 def generate_wigal_otp(phone):
     try:
-        import random
-        otp_code = str(random.randint(100000, 999999))
+        # SECURE: Use secrets for crypto-safe randomness
+        import secrets
+        otp_code = ''.join([secrets.choice('0123456789') for i in range(6)])
         msg = f"Your FAYM Library OTP is {otp_code}.\nValid for 5 minutes."
         send_sms_wigal(phone, msg)
         return otp_code
@@ -336,6 +363,11 @@ def verify_wigal_otp(phone, code):
 
 # --- OTP Views (Unchanged Logic, just compacted) ---
 def send_otp(request):
+    # RATE LIMIT: 2 requests per 15 minutes per IP
+    limiter = rate_limit('send_otp', limit=2, period=900)
+    if not limiter(request):
+        return JsonResponse({'status': 'error', 'message': 'Too many requests. Please wait 15 minutes.'})
+
     identity = request.POST.get('identity', '').strip()
     member = Member.objects.filter(email__iexact=identity).first()
     if not member:
@@ -406,11 +438,23 @@ def submit_request(request):
              return JsonResponse({'status': 'error', 'message': 'Session Expired.'})
 
         book_id = request.POST.get('book_id')
-        identity = request.POST.get('identity')
+        
+        # SECURE IDOR FIX: Use session data ONLY
+        # identity = request.POST.get('identity') <--- DELETED (Unsafe)
+        
+        verified_phone = request.session.get('verified_identity')
+        if not verified_phone:
+             return JsonResponse({'status': 'error', 'message': 'User not verified.'})
+
+        member = Member.objects.filter(mobile_number=verified_phone).first()
+        # Fallback check for email if verified_identity stores email (for older sessions)
+        if not member: 
+             member = Member.objects.filter(email=verified_phone).first()
+
         book = get_object_or_404(Book, book_id=book_id)
-        member = Member.objects.filter(email__iexact=identity).first()
+        
         if not member:
-            return JsonResponse({'status': 'error', 'message': 'Authentication Error.'})
+            return JsonResponse({'status': 'error', 'message': 'Authentication Error: Member profile not found.'})
             
         limit_error = check_request_limits(member, book.type)
         if limit_error:
